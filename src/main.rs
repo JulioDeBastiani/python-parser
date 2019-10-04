@@ -178,10 +178,14 @@ fn get_line_indentation(line: &Vec<char>) -> usize {
     ind
 }
 
-fn get_string_literal(line: &Vec<char>, delimiter: char, col: &mut usize, row: usize) -> String {
+fn get_string_literal(line: &Vec<char>, delimiter: char, col: usize, row: usize) -> Option<(Token, usize)> {
+    if line[col] != delimiter {
+        return None;
+    }
+    
     let mut lexema = String::default();
     lexema.push(delimiter);
-    let mut icol = *col + 1;
+    let mut icol = col + 1;
     
     loop {
         lexema.push(line[icol]);
@@ -205,19 +209,19 @@ fn get_string_literal(line: &Vec<char>, delimiter: char, col: &mut usize, row: u
         }
     }
 
-    *col = icol;
-    lexema
+    let token = Token::new(TkType::Literal(LiteralTypes::String), lexema, row, col);
+    Some((token, icol))
 }
 
-fn get_lexema_as_int_literal(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
-    let mut icol = *col;
+fn get_int_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+    let mut icol = col;
 
     if !line[icol].is_numeric() {
         return None;
     }
     
     let mut lexema = String::default();
-    lexema.push(line[*col]);
+    lexema.push(line[col]);
     icol += 1;
 
     loop {
@@ -231,22 +235,22 @@ fn get_lexema_as_int_literal(line: &Vec<char>, col: &mut usize, row: usize) -> O
             break;
         } else {
             // TODO tratar os erros igual gente decente
-            panic!("Invalid literal at: row {}, col {}", row, *col);
+            panic!("Invalid literal at: row {}, col {}", row, col);
         }
 
         icol += 1;
     }
 
     if let Ok(_) = lexema.parse::<i32>() {
-        *col = icol;
-        Some(lexema)
+        let token = Token::new(TkType::Literal(LiteralTypes::Int), lexema, row, col);
+        Some((token, icol))
     } else {
         None
     }
 }
 
-fn get_lexema_as_float_literal(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
-    let mut icol = *col;
+fn get_float_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+    let mut icol = col;
 
     if line[icol] != '.' && !line[icol].is_numeric() {
         return None;
@@ -271,29 +275,29 @@ fn get_lexema_as_float_literal(line: &Vec<char>, col: &mut usize, row: usize) ->
             break;
         } else {
             // TODO tratar os erros igual gente decente
-            panic!("Invalid literal at: row {}, col {}", row, *col);
+            panic!("Invalid literal at: row {}, col {}", row, col);
         }
 
         icol += 1;
     }
 
     if had_dot {
-        *col = icol;
-        Some(lexema)
+        let token = Token::new(TkType::Literal(LiteralTypes::Float), lexema, row, col);
+        Some((token, icol))
     } else {
         None
     }
 }
 
-fn get_lexema_as_operator(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
-    let mut icol = *col;
+fn get_operator(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+    let mut icol = col;
 
     if !char_defines_operator(line[icol]) {
         return None;
     }
 
     let mut lexema = String::default();
-    lexema.push(line[*col]);
+    lexema.push(line[col]);
     icol += 1;
 
     loop {
@@ -314,15 +318,21 @@ fn get_lexema_as_operator(line: &Vec<char>, col: &mut usize, row: usize) -> Opti
     }
 
     if !lexema.is_empty() {
-        *col = icol;
-        Some(lexema)
+        let id = match OPERATORS.iter().find(|op| op.0 == lexema) {
+            Some(op) => op.1,
+            // TODO tratar os erros igual gente decente
+            None => panic!("Invalid operation at: row {}, col {}", row, col)
+        };
+
+        let token = Token::new(TkType::Operator(id), lexema, row, col);
+        Some((token, icol))
     } else {
         None
     }
 }
 
-fn get_lexema_as_reserved_word(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
-    let mut icol = *col;
+fn get_lexema_as_reserved_word_or_identifier(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+    let mut icol = col;
 
     if !line[icol].is_ascii_alphabetic() {
         return None;
@@ -346,12 +356,13 @@ fn get_lexema_as_reserved_word(line: &Vec<char>, col: &mut usize, row: usize) ->
         icol += 1
     }
 
-    if RESERVED_WORDS.iter().any(|rw| rw.0 == lexema) {
-        *col = icol;
-        Some(lexema)
-    } else {
-        None
-    }
+    let tp = match RESERVED_WORDS.iter().find(|i| i.0 == lexema) {
+        Some(i) => TkType::ReservedWord(i.1),
+        None => TkType::Identifier,
+    };
+        
+    let token = Token::new(tp, lexema, row, col);
+    Some((token icol))
 }
 
 fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
