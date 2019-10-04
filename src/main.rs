@@ -6,198 +6,126 @@ use std::fs::File;
 // use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 
-static reserved_words: [[&'static str; 2]; 33] = [
-    ["and", "TK.AND"],
-    ["as", "TK.AS"],
-    ["assert", "TK.ASSERT"],
-    ["break", "TK.BREAK"],
-    ["class", "TK.CLASS"],
-    ["continue", "TK.CONTINUE"],
-    ["def", "TK.DEF"],
-    ["del", "TK.DEL"],
-    ["elif", "TK.ELIF"],
-    ["else", "TK.ELSE"],
-    ["except", "TK.EXCEPT"],
-    ["exec", "TK.EXEC"],
-    ["finally", "TK.FINALLY"],
-    ["for", "TK.FOR"],
-    ["from", "TK.FROM"],
-    ["global", "TK.GLOBAL"],
-    ["if", "TK.IF"],
-    ["import", "TK.IMPORT"],
-    ["in", "TK.IN"],
-    ["is", "TK.IS"],
-    ["lambda", "TK.LAMBDA"],
-    ["none", "TK.NONE"],
-    ["nonlocal", "TK.NONLOCAL"],
-    ["not", "TK.NOT"],
-    ["or", "TK.OR"],
-    ["pass", "TK.PASS"],
-    ["print", "TK.PRINT"],
-    ["raise", "TK.RAISE"],
-    ["return", "TK.RETURN"],
-    ["try", "TK.TRY"],
-    ["while", "TK.WHILE"],
-    ["with", "TK.WITH"],
-    ["yield", "TK.YIELD"]
+static RESERVED_WORDS: [(&'static str, &'static str); 33] = [
+    ("and", "TK.AND"),
+    ("as", "TK.AS"),
+    ("assert", "TK.ASSERT"),
+    ("break", "TK.BREAK"),
+    ("class", "TK.CLASS"),
+    ("continue", "TK.CONTINUE"),
+    ("def", "TK.DEF"),
+    ("del", "TK.DEL"),
+    ("elif", "TK.ELIF"),
+    ("else", "TK.ELSE"),
+    ("except", "TK.EXCEPT"),
+    ("exec", "TK.EXEC"),
+    ("finally", "TK.FINALLY"),
+    ("for", "TK.FOR"),
+    ("from", "TK.FROM"),
+    ("global", "TK.GLOBAL"),
+    ("if", "TK.IF"),
+    ("import", "TK.IMPORT"),
+    ("in", "TK.IN"),
+    ("is", "TK.IS"),
+    ("lambda", "TK.LAMBDA"),
+    ("none", "TK.NONE"),
+    ("nonlocal", "TK.NONLOCAL"),
+    ("not", "TK.NOT"),
+    ("or", "TK.OR"),
+    ("pass", "TK.PASS"),
+    ("print", "TK.PRINT"),
+    ("raise", "TK.RAISE"),
+    ("return", "TK.RETURN"),
+    ("try", "TK.TRY"),
+    ("while", "TK.WHILE"),
+    ("with", "TK.WITH"),
+    ( "yield", "TK.YIELD")
 ];
 
-// fn get_reserved_words() -> HashMap<&'static str, &'static str> {
-//     let mut rwords = HashMap::new();
-//     rwords.insert("and", "TK.AND");
-//     rwords.insert("as", "TK.AS");
-//     rwords.insert("assert", "TK.ASSERT");
-//     rwords.insert("break", "TK.BREAK");
-//     rwords.insert("class", "TK.CLASS");
-//     rwords.insert("continue", "TK.CONTINUE");
-//     rwords.insert("def", "TK.DEF");
-//     rwords.insert("del", "TK.DEL");
-//     rwords.insert("elif", "TK.ELIF");
-//     rwords.insert("else", "TK.ELSE");
-//     rwords.insert("except", "TK.EXCEPT");
-//     rwords.insert("exec", "TK.EXEC");
-//     rwords.insert("finally", "TK.FINALLY");
-//     rwords.insert("for", "TK.FOR");
-//     rwords.insert("from", "TK.FROM");
-//     rwords.insert("global", "TK.GLOBAL");
-//     rwords.insert("if", "TK.IF");
-//     rwords.insert("import", "TK.IMPORT");
-//     rwords.insert("in", "TK.IN");
-//     rwords.insert("is", "TK.IS");
-//     rwords.insert("lambda", "TK.LAMBDA");
-//     rwords.insert("none", "TK.NONE");
-//     rwords.insert("nonlocal", "TK.NONLOCAL");
-//     rwords.insert("not", "TK.NOT");
-//     rwords.insert("or", "TK.OR");
-//     rwords.insert("pass", "TK.PASS");
-//     rwords.insert("print", "TK.PRINT");
-//     rwords.insert("raise", "TK.RAISE");
-//     rwords.insert("return", "TK.RETURN");
-//     rwords.insert("try", "TK.TRY");
-//     rwords.insert("while", "TK.WHILE");
-//     rwords.insert("with", "TK.WITH");
-//     rwords.insert("yield", "TK.YIELD");
-//     rwords
-// }
-
-static operators: [[&'static str; 2]; 44] = [
-    ["+", "TK.MAIS"],
-    ["-", "TK.MENOS"],
-    ["*", "TK.VEZES"],
-    ["/", "TK.BARRA"],
-    ["%", "TK.PORCENTO"],
-    ["&", "TK.ECOMERCIAL"],
-    ["|", "TK.PIPE"],
-    ["^", "TK.CIRCUMFLEXO"],
-    ["~", "TK.TIL"],
-    ["<", "TK.MENOR"],
-    [">", "TK.MAIOR"],
-    ["(", "TK.PARENTESES_ESQUERDO"],
-    [")", "TK.PARENTESES_DIREITO"],
-    ["[", "TK.COLCHETES_ESQUERDO"],
-    ["]", "TK.COLCHETES_DIREITO"],
-    ["{", "TK.CHAVES_ESQUERDA"],
-    ["}", "TK.CHAVES_DIREITA"],
-    [",", "TK.VIRGULA"],
-    [":", "TK.DOIS_PONTOS"],
-    [".", "TK.PONTO"],
-    [";", "TK.PONTO_VIRGULA"],
-    ["@", "TK.ARROBA"],
-    ["=", "TK.IGUAL"],
-    ["**", "TK.NOME_PARAMETRO"],
-    ["//", "TK.BARRA_DUPLA"],
-    ["<<", "TK.SHIFT_LEFT"],
-    [">>", "TK.SHIFT_RIGHT"],
-    ["<=", "TK.MENOR_IGUAL"],
-    [">=", "TK.MAIOR_IGUAL"],
-    ["==", "TK.IGUAL_IGUAL"],
-    ["!=", "TK.DIFERENTE"],
-    ["+=", "TK.MAIS_IGUAL"],
-    ["-=", "TK.MENOS_IGUAL"],
-    ["*=", "TK.VEZES_IGUAL"],
-    ["/=", "TK.BARRA_IGUAL"],
-    ["//=", "TK.BARRA_DUPLA_IGUAL"],
-    ["%=", "TK.PORCENTO_IGUAL"],
-    ["@=", "TK.ARROBA_IGUAL"],
-    ["&=", "TK.ECOMERCIAL_IGUAL"],
-    ["|=", "TK.PIPE_IGUAL"],
-    ["^=", "TK.CIRCUMFLEXO_IGUAL"],
-    [">>=", "TK.SHIFT_RIGHT_IGUAL"],
-    ["<<=", "TK.SHIFT_LEFT_IGUAL"],
-    ["**=", "TK.DUPLO_ASTERISCO_IGUAL"]
+static OPERATORS: [(&'static str, &'static str); 44] = [
+    ("+", "TK.MAIS"),
+    ("-", "TK.MENOS"),
+    ("*", "TK.VEZES"),
+    ("/", "TK.BARRA"),
+    ("%", "TK.PORCENTO"),
+    ("&", "TK.ECOMERCIAL"),
+    ("|", "TK.PIPE"),
+    ("^", "TK.CIRCUMFLEXO"),
+    ("~", "TK.TIL"),
+    ("<", "TK.MENOR"),
+    (">", "TK.MAIOR"),
+    ("(", "TK.PARENTESES_ESQUERDO"),
+    (")", "TK.PARENTESES_DIREITO"),
+    ("[", "TK.COLCHETES_ESQUERDO"),
+    ("]", "TK.COLCHETES_DIREITO"),
+    ("{", "TK.CHAVES_ESQUERDA"),
+    ("}", "TK.CHAVES_DIREITA"),
+    (",", "TK.VIRGULA"),
+    (":", "TK.DOIS_PONTOS"),
+    (".", "TK.PONTO"),
+    (";", "TK.PONTO_VIRGULA"),
+    ("@", "TK.ARROBA"),
+    ("=", "TK.IGUAL"),
+    ("**", "TK.NOME_PARAMETRO"),
+    ("//", "TK.BARRA_DUPLA"),
+    ("<<", "TK.SHIFT_LEFT"),
+    (">>", "TK.SHIFT_RIGHT"),
+    ("<=", "TK.MENOR_IGUAL"),
+    (">=", "TK.MAIOR_IGUAL"),
+    ("==", "TK.IGUAL_IGUAL"),
+    ("!=", "TK.DIFERENTE"),
+    ("+=", "TK.MAIS_IGUAL"),
+    ("-=", "TK.MENOS_IGUAL"),
+    ("*=", "TK.VEZES_IGUAL"),
+    ("/=", "TK.BARRA_IGUAL"),
+    ("//=", "TK.BARRA_DUPLA_IGUAL"),
+    ("%=", "TK.PORCENTO_IGUAL"),
+    ("@=", "TK.ARROBA_IGUAL"),
+    ("&=", "TK.ECOMERCIAL_IGUAL"),
+    ("|=", "TK.PIPE_IGUAL"),
+    ("^=", "TK.CIRCUMFLEXO_IGUAL"),
+    (">>=", "TK.SHIFT_RIGHT_IGUAL"),
+    ("<<=", "TK.SHIFT_LEFT_IGUAL"),
+    ("**=", "TK.DUPLO_ASTERISCO_IGUAL")
 ];
 
-// fn get_simple_operators() -> HashMap<char, &'static str> {
-//     let mut rwords = HashMap::new();
-//     rwords.insert('+', "TK.MAIS");
-//     rwords.insert('-', "TK.MENOS");
-//     rwords.insert('*', "TK.VEZES");
-//     rwords.insert('/', "TK.BARRA");
-//     rwords.insert('%', "TK.PORCENTO");
-//     rwords.insert('&', "TK.ECOMERCIAL");
-//     rwords.insert('|', "TK.PIPE");
-//     rwords.insert('^', "TK.CIRCUMFLEXO");
-//     rwords.insert('~', "TK.TIL");
-//     rwords.insert('<', "TK.MENOR");
-//     rwords.insert('>', "TK.MAIOR");
-//     rwords.insert('(', "TK.PARENTESES_ESQUERDO");
-//     rwords.insert(')', "TK.PARENTESES_DIREITO");
-//     rwords.insert('[', "TK.COLCHETES_ESQUERDO");
-//     rwords.insert(']', "TK.COLCHETES_DIREITO");
-//     rwords.insert('{', "TK.CHAVES_ESQUERDA");
-//     rwords.insert('}', "TK.CHAVES_DIREITA");
-//     rwords.insert(',', "TK.VIRGULA");
-//     rwords.insert(':', "TK.DOIS_PONTOS");
-//     rwords.insert('.', "TK.PONTO");
-//     rwords.insert(';', "TK.PONTO_VIRGULA");
-//     rwords.insert('@', "TK.ARROBA");
-//     rwords.insert('=', "TK.IGUAL");
-//     rwords
-// }
+fn char_defines_operator(c: char) -> bool {
+    match c {
+        '+' => true,
+        '-' => true,
+        '*' => true,
+        '/' => true,
+        '%' => true,
+        '&' => true,
+        '|' => true,
+        '^' => true,
+        '~' => true,
+        '<' => true,
+        '>' => true,
+        '(' => true,
+        ')' => true,
+        '[' => true,
+        ']' => true,
+        '{' => true,
+        '}' => true,
+        ',' => true,
+        ':' => true,
+        '.' => true,
+        ';' => true,
+        '@' => true,
+        '=' => true,
+        _ => false
+    }
+}
 
-// fn get_composed_operators() -> HashMap<&'static str, &'static str> {
-//     let mut rwords = HashMap::new();
-//     rwords.insert("**", "TK.NOME_PARAMETRO");
-//     rwords.insert("//", "TK.BARRA_DUPLA");
-//     rwords.insert("<<", "TK.SHIFT_LEFT");
-//     rwords.insert(">>", "TK.SHIFT_RIGHT");
-//     rwords.insert("<=", "TK.MENOR_IGUAL");
-//     rwords.insert(">=", "TK.MAIOR_IGUAL");
-//     rwords.insert("==", "TK.IGUAL_IGUAL");
-//     rwords.insert("!=", "TK.DIFERENTE");
-//     rwords.insert("+=", "TK.MAIS_IGUAL");
-//     rwords.insert("-=", "TK.MENOS_IGUAL");
-//     rwords.insert("*=", "TK.VEZES_IGUAL");
-//     rwords.insert("/=", "TK.BARRA_IGUAL");
-//     rwords.insert("//=", "TK.BARRA_DUPLA_IGUAL");
-//     rwords.insert("%=", "TK.PORCENTO_IGUAL");
-//     rwords.insert("@=", "TK.ARROBA_IGUAL");
-//     rwords.insert("&=", "TK.ECOMERCIAL_IGUAL");
-//     rwords.insert("|=", "TK.PIPE_IGUAL");
-//     rwords.insert("^=", "TK.CIRCUMFLEXO_IGUAL");
-//     rwords.insert(">>=", "TK.SHIFT_RIGHT_IGUAL");
-//     rwords.insert("<<=", "TK.SHIFT_LEFT_IGUAL");
-//     rwords.insert("**=", "TK.DUPLO_ASTERISCO_IGUAL");
-//     rwords
-// }
-
-// static comment_ln_delimiter: &'static str = "#";
-
-// fn get_comment_line_delimiters() -> Vec<&'static str> {
-//     vec!["#"]
-// }
-
-// static comment_block_delimiters: [&'static str; 2] = ["'''", "\"\"\""];
-
-// fn get_comment_block_delimiters() -> Vec<&'static str> {
-//     vec!["'''", "\"\"\""]
-// }
-
-// static string_literal_delimiters: [&'static str; 2] = ["'", "\""];
-
-// fn get_string_literal_delimiters() -> Vec<&'static str> {
-//     vec!["'", "\""]
-// }
+fn char_acts_as_separator(c: char) -> bool {
+    match c {
+        ' ' => true,
+        '\t' => true,
+        '\n' => true,
+        _ => false
+    }
+}
 
 #[derive(Debug, PartialEq)]
 enum LiteralTypes {
@@ -220,12 +148,12 @@ enum TkType {
 struct Token {
     tk_type: TkType,
     lexema: String,
-    row: u32,
-    col: u32
+    row: usize,
+    col: usize
 }
 
 impl Token {
-    fn new(tk_type: TkType, lexema: &str, row: u32, col: u32) -> Token {
+    fn new(tk_type: TkType, lexema: String, row: usize, col: usize) -> Token {
         Token {
             tk_type: tk_type,
             lexema: lexema.to_owned(),
@@ -235,91 +163,192 @@ impl Token {
     }
 }
 
-fn get_token_type(lexema: &str) -> TkType {
-    if let Some(i) = operators.iter().position(|o| o[0] == lexema) {
-        TkType::Operator(operators[i][1])
-    } else if let Some(i) = operators.iter().position(|w| w[0] == lexema) {
-        TkType::ReservedWord(operators[i][1])
-    } else if let Ok(_) = lexema.parse::<i32>() {
-        TkType::Literal(LiteralTypes::Int)
-    } else if let Ok(_) = lexema.parse::<f32>() {
-        TkType::Literal(LiteralTypes::Float)
-    } else {
-        match lexema.chars().next() {
-            Some('"') => TkType::Literal(LiteralTypes::String),
-            Some('\'') => TkType::Literal(LiteralTypes::String),
-            _ => TkType::Identifier
+// TODO passar um option com o char de indentacao do arquivo
+fn get_line_indentation(line: &Vec<char>) -> usize {
+    let mut ind: usize = 0;
+
+    for c in line.iter() {
+        match c {
+            ' ' => ind += 1,
+            '\t' => ind += 1,
+            _ => break,
         }
     }
+
+    ind
 }
 
-fn run(src_file: &str, out_dir: &str) -> std::io::Result<()> {
-    // let reserved_words = get_reserved_words();
-    // let simple_operators = get_simple_operators();
-    // let composed_operators = get_composed_operators();
-    // let comment_line_delimiters = get_comment_line_delimiters();
-    // let comment_block_delimiters = get_comment_block_delimiters();
-    // let string_literal_delimiters = get_string_literal_delimiters();
-
-    let mut tokens = Vec::new();
-    let mut ind = Vec::new();
-    let mut currtk = String::default();
+fn get_string_literal(line: &Vec<char>, delimiter: char, col: &mut usize, row: usize) -> String {
+    let mut lexema = String::default();
+    lexema.push(delimiter);
+    let mut icol = *col + 1;
     
+    loop {
+        lexema.push(line[icol]);
+        
+        match line[icol] {
+            // TODO tratar os erros igual gente decente
+            '\n' => panic!("Unexpected end of line at: row {}, col {}", row, icol),
+            '\\' => {
+                if line[icol + 1] == delimiter {
+                    lexema.push(delimiter);
+                    icol += 2;
+                }
+            },
+            delimiter => {
+                icol += 1;
+                break;
+            },
+            _ => {
+                icol += 1;
+            }
+        }
+    }
+
+    *col = icol;
+    lexema
+}
+
+fn get_lexema_as_int_literal(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
+    let mut lexema = String::default();
+    lexema.push(line[*col]);
+    let mut icol = *col + 1;
+
+    loop {
+        let c = line[icol];
+
+        if c.is_numeric() {
+            lexema.push(c);
+        } else if char_acts_as_separator(c) {
+            if lexema.is_empty() {
+                return None;
+            } else {
+                break;
+            }
+        } else if char_defines_operator(c) {
+            if lexema.is_empty() {
+                return None;
+            } else {
+                break;
+            }
+        } else {
+            if lexema.is_empty() {
+                return None;
+            } else {
+                // TODO tratar os erros igual gente decente
+                panic!("Invalid literal at: row {}, col {}", row, col);
+            }
+        }
+    }
+
+    *col = icol;
+    Some(lexema)
+}
+
+fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
+    let mut tokens = Vec::new();
+    let mut src = BufReader::new(File::open(src_file)?);
+
+    // TODO anotar o processo melhor
+    // TODO `log` seria uma boa ideia
     println!("Tokenazing: \"{}\"", src_file);
-    let mut src = BufReader::new(File::open(src_file).expect("Could not open source file"));
+
     let mut buf = Vec::<u8>::new();
+    let mut ind = Vec::new();
 
-    let mut row = 0;
+    let mut row: usize = 0;
 
-    while src.read_until(b'\n', &mut buf).expect("could not read line") != 0 {
+    while src.read_until(b'\n', &mut buf)? != 0 {
+        // TODO tratar os erros igual gente decente
         let l = String::from_utf8(buf).expect("source file is not UTF-8");
 
-        let mut gen = l.chars();
-        let mut curc;
+        let line: Vec<char> = l.chars().collect();
 
-        match gen.next() {
-            Some(c) => curc = c,
-            None => break
-        }
+        // Indentacao
+        let line_indentation = get_line_indentation(&line);
+        let next_char_col = line_indentation + 1;
 
-        let mut col = 0;
-        let mut curind = 0;
-
-        loop {
-            match curc {
-                ' ' => curind += 1,
-                '\t' => curind += 1,
-                _ => break
-            }
-
-            match gen.next() {
-                Some(c) => curc = c,
-                // FIXME tecnicamente e valido, so nao deveria gerar indentacao, pensar em uma maneira de sair dos dois loops
-                None => panic!("Invalid EOF at: row {}, col {}", row, col)
-            }
-
-            col += 1;
-        }
-
-        // Se for so uma linha com espacos/tabs, ignorar a indentacao
-        if curc != '\n' {
+        // Ignora se for uma linha em branco
+        if line.len() >= next_char_col && line[next_char_col] != '\n' {
+            // TODO rename
             let tot_ind = ind.iter().sum();
 
-            if curind < tot_ind {
-                let difference = tot_ind - curind;
+            if line_indentation < tot_ind {
+                let difference = tot_ind - line_indentation;
 
                 if Some(&difference) != ind.last() {
-                    panic!("Invalid indentation at: row {}, col {}", row, col);
+                    // TODO tratar os erros igual gente decente
+                    panic!("Invalid indentation at: row {}, col {}", row, line_indentation);
                 }
                 
                 ind.pop();
-                tokens.push(Token::new(TkType::Dedentation, "", row, col));
-            } else if curind > tot_ind {
-                let difference = curind - tot_ind;
+                tokens.push(Token::new(TkType::Dedentation, "".to_owned(), row, 0));
+            } else if line_indentation > tot_ind {
+                let difference = line_indentation - tot_ind;
                 ind.push(difference);
-                tokens.push(Token::new(TkType::Indentaion, "", row, col));
+                tokens.push(Token::new(TkType::Indentaion, "".to_owned(), row, 0));
+            }
+
+        }
+        
+        let mut col = line_indentation;
+        let mut col_ini = col;
+
+        loop {
+            let mut currtk = String::default();
+
+            match line[col] {
+                ' ' => {
+                    // TODO salvar token
+                },
+                '\t' => {
+                    // TODO salvar token
+                },
+                '\n' => {
+                    // TODO salvar token
+                    break;
+                },
+                '#' => {
+                    // TODO salvar token
+                    break;
+                },
+                '\'' => {
+                    // TODO bloco de comentario
+                    let lexema = get_string_literal(&line, '\'', &mut col, row);
+                    tokens.push(Token::new(TkType::Literal(LiteralTypes::String), lexema, row, col_ini));
+                },
+                '"' => {
+                    // TODO bloco de comentario
+                    let lexema = get_string_literal(&line, '\'', &mut col, row);
+                    tokens.push(Token::new(TkType::Literal(LiteralTypes::String), lexema, row, col_ini));
+                },
+                c => {
+
+                }
             }
         }
+        
+        buf = l.into_bytes();
+        buf.clear();
+    }
+    
+    Ok(tokens)
+}
+
+fn run(src_file: &str, out_dir: &str) -> std::io::Result<()> {
+    let tokens = generate_tokens(src_file)?;
+    
+    // let mut tokens = Vec::new();
+    // let mut ind = Vec::new();
+    // let mut currtk = String::default();
+    
+    // println!("Tokenazing: \"{}\"", src_file);
+    // let mut src = BufReader::new(File::open(src_file).expect("Could not open source file"));
+    // let mut buf = Vec::<u8>::new();
+
+    // let mut row = 0;
+
+    while src.read_until(b'\n', &mut buf).expect("could not read line") != 0 {
 
         let mut col_ini = col;
         let mut isop = false;
@@ -395,7 +424,7 @@ fn run(src_file: &str, out_dir: &str) -> std::io::Result<()> {
                     
                     
                     
-                    let lisop = operators.iter().any(|o| o[0].chars().next().unwrap() == c);
+                    let lisop = OPERATORS.iter().any(|o| o[0].chars().next().unwrap() == c);
 
                     if currtk.is_empty() {
                         isop = lisop;
