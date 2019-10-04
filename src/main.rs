@@ -4,7 +4,7 @@ use clap::{Arg, App};
 
 use std::fmt;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, Write, BufReader, BufWriter};
 
 static RESERVED_WORDS: [(&'static str, &'static str); 33] = [
     ("and", "RWORD{AND}"),
@@ -509,6 +509,13 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
 }
 
 fn dump_tokens(tokens: &Vec<Token>, filename: &str) -> std::io::Result<()> {
+    let mut out = BufWriter::new(File::create(filename)?);
+
+    for token in tokens.iter() {
+        let line = format!("{}\n", token);
+        out.write_all(line.as_bytes())?;
+    }
+    
     Ok(())
 }
 
