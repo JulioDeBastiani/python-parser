@@ -210,9 +210,15 @@ fn get_string_literal(line: &Vec<char>, delimiter: char, col: &mut usize, row: u
 }
 
 fn get_lexema_as_int_literal(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
+    let mut icol = *col;
+
+    if !line[icol].is_numeric() {
+        return None;
+    }
+    
     let mut lexema = String::default();
     lexema.push(line[*col]);
-    let mut icol = *col + 1;
+    icol += 1;
 
     loop {
         let c = line[icol];
@@ -220,29 +226,132 @@ fn get_lexema_as_int_literal(line: &Vec<char>, col: &mut usize, row: usize) -> O
         if c.is_numeric() {
             lexema.push(c);
         } else if char_acts_as_separator(c) {
-            if lexema.is_empty() {
-                return None;
-            } else {
-                break;
-            }
+            break;
         } else if char_defines_operator(c) {
-            if lexema.is_empty() {
-                return None;
-            } else {
-                break;
-            }
+            break;
         } else {
-            if lexema.is_empty() {
-                return None;
-            } else {
-                // TODO tratar os erros igual gente decente
-                panic!("Invalid literal at: row {}, col {}", row, col);
-            }
+            // TODO tratar os erros igual gente decente
+            panic!("Invalid literal at: row {}, col {}", row, *col);
         }
+
+        icol += 1;
     }
 
-    *col = icol;
-    Some(lexema)
+    if let Ok(_) = lexema.parse::<i32>() {
+        *col = icol;
+        Some(lexema)
+    } else {
+        None
+    }
+}
+
+fn get_lexema_as_float_literal(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
+    let mut icol = *col;
+
+    if line[icol] != '.' && !line[icol].is_numeric() {
+        return None;
+    }
+    
+    let mut lexema = String::default();
+    lexema.push(line[icol]);
+    let mut had_dot = line[icol] == '.';
+    icol += 1;
+
+    loop {
+        let c = line[icol];
+
+        if c.is_numeric() {
+            lexema.push(c);
+        } else if c == '.' && !had_dot {
+            lexema.push('.');
+            had_dot = true;
+        } else if char_acts_as_separator(c) {
+            break;
+        } else if char_defines_operator(c) {
+            break;
+        } else {
+            // TODO tratar os erros igual gente decente
+            panic!("Invalid literal at: row {}, col {}", row, *col);
+        }
+
+        icol += 1;
+    }
+
+    if had_dot {
+        *col = icol;
+        Some(lexema)
+    } else {
+        None
+    }
+}
+
+fn get_lexema_as_operator(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
+    let mut icol = *col;
+
+    if !char_defines_operator(line[icol]) {
+        return None;
+    }
+
+    let mut lexema = String::default();
+    lexema.push(line[*col]);
+    icol += 1;
+
+    loop {
+        let c = line[icol];
+
+        if char_defines_operator(c) {
+            lexema.push(c);
+        } else {
+            break;
+        }
+
+        if !OPERATORS.iter().any(|op| op.0 == lexema) {
+            lexema.pop();
+            break;
+        }
+
+        icol += 1;
+    }
+
+    if !lexema.is_empty() {
+        *col = icol;
+        Some(lexema)
+    } else {
+        None
+    }
+}
+
+fn get_lexema_as_reserved_word(line: &Vec<char>, col: &mut usize, row: usize) -> Option<String> {
+    let mut icol = *col;
+
+    if !line[icol].is_ascii_alphabetic() {
+        return None;
+    }
+    
+    let mut lexema = String::default();
+    lexema.push(line[icol]);
+    icol += 1;
+
+    loop {
+        let c = line[icol];
+
+        if char_defines_operator(c) {
+            break;
+        }
+
+        if char_acts_as_separator(c) {
+            break;
+        }
+
+        icol += 1
+    }
+
+    if RESERVED_WORDS.iter().any(|rw| rw.0 == lexema) {
+        *col = icol;
+        Some(lexema)
+    } else {
+        None
+    }
 }
 
 fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
@@ -295,8 +404,6 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         let mut col_ini = col;
 
         loop {
-            let mut currtk = String::default();
-
             match line[col] {
                 ' ' => {
                     // TODO salvar token
@@ -323,6 +430,16 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
                     tokens.push(Token::new(TkType::Literal(LiteralTypes::String), lexema, row, col_ini));
                 },
                 c => {
+                    if let Some(lexema) = get_lexema_as_int_literal(&line, &mut col, row) {
+                        tokens.push(Token::new(TkType::Literal(LiteralTypes::Int), lexema, row, col_ini));
+                        continue;
+                    }
+
+                    if let Some(lexema) = get_lexema_as_float_literal(&line, &mut col, row) {
+                        tokens.push(Token::new(TkType::Literal(LiteralTypes::Float), lexema, row, col_ini));
+                        continue;
+                    }
+
 
                 }
             }
