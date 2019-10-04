@@ -331,7 +331,7 @@ fn get_operator(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usiz
     }
 }
 
-fn get_lexema_as_reserved_word_or_identifier(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+fn get_reserved_word_or_identifier(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
     let mut icol = col;
 
     if !line[icol].is_ascii_alphabetic() {
@@ -362,7 +362,7 @@ fn get_lexema_as_reserved_word_or_identifier(line: &Vec<char>, col: usize, row: 
     };
         
     let token = Token::new(tp, lexema, row, col);
-    Some((token icol))
+    Some((token, icol))
 }
 
 fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
@@ -412,49 +412,75 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         }
         
         let mut col = line_indentation;
-        let mut col_ini = col;
 
         loop {
             match line[col] {
                 ' ' => {
-                    // TODO salvar token
+                    col += 1;
                 },
                 '\t' => {
-                    // TODO salvar token
+                    col += 1;
                 },
                 '\n' => {
-                    // TODO salvar token
                     break;
                 },
                 '#' => {
-                    // TODO salvar token
                     break;
                 },
                 '\'' => {
                     // TODO bloco de comentario
-                    let lexema = get_string_literal(&line, '\'', &mut col, row);
-                    tokens.push(Token::new(TkType::Literal(LiteralTypes::String), lexema, row, col_ini));
+                    match get_string_literal(&line, '\'', col, row) {
+                        Some((token, icol)) => {
+                            tokens.push(token);
+                            col = icol;
+                        }
+                        // TODO errors
+                        None => panic!("Invalid Token at: row {}, col {}", row, col)
+                    }
                 },
                 '"' => {
                     // TODO bloco de comentario
-                    let lexema = get_string_literal(&line, '\'', &mut col, row);
-                    tokens.push(Token::new(TkType::Literal(LiteralTypes::String), lexema, row, col_ini));
+                    match get_string_literal(&line, '"', col, row) {
+                        Some((token, icol)) => {
+                            tokens.push(token);
+                            col = icol;
+                        }
+                        // TODO errors
+                        None => panic!("Invalid Token at: row {}, col {}", row, col)
+                    }
                 },
                 c => {
-                    if let Some(lexema) = get_lexema_as_int_literal(&line, &mut col, row) {
-                        tokens.push(Token::new(TkType::Literal(LiteralTypes::Int), lexema, row, col_ini));
+                    if let Some((token, icol)) = get_float_literal(&line, col, row) {
+                        tokens.push(token);
+                        col = icol;
                         continue;
                     }
 
-                    if let Some(lexema) = get_lexema_as_float_literal(&line, &mut col, row) {
-                        tokens.push(Token::new(TkType::Literal(LiteralTypes::Float), lexema, row, col_ini));
+                    if let Some((token, icol)) = get_int_literal(&line, col, row) {
+                        tokens.push(token);
+                        col = icol;
                         continue;
                     }
 
+                    if let Some((token, icol)) = get_operator(&line, col, row) {
+                        tokens.push(token);
+                        col = icol;
+                        continue;
+                    }
 
+                    if let Some((token, icol)) = get_reserved_word_or_identifier(&line, col, row) {
+                        tokens.push(token);
+                        col = icol;
+                        continue;
+                    }
+
+                    // TODO errors
+                    panic!("Unidentified Token at: row {}, col {}", row, col)
                 }
             }
         }
+
+        row += 1;
         
         buf = l.into_bytes();
         buf.clear();
