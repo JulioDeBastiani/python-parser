@@ -198,6 +198,8 @@ fn get_line_indentation(line: &Vec<char>) -> usize {
 }
 
 fn get_string_literal(line: &Vec<char>, delimiter: char, col: usize, row: usize) -> Option<(Token, usize)> {
+    println!("get string literal");
+    
     if line[col] != delimiter {
         return None;
     }
@@ -233,6 +235,8 @@ fn get_string_literal(line: &Vec<char>, delimiter: char, col: usize, row: usize)
 }
 
 fn get_int_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+    println!("get int literal");
+    
     let mut icol = col;
 
     if !line[icol].is_numeric() {
@@ -269,6 +273,8 @@ fn get_int_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, u
 }
 
 fn get_float_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+    println!("get float literal {}", line[col] != '.' && !line[col].is_numeric());
+
     let mut icol = col;
 
     if line[icol] != '.' && !line[icol].is_numeric() {
@@ -293,6 +299,10 @@ fn get_float_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token,
         } else if char_defines_operator(c) {
             break;
         } else {
+            if lexema == "." {
+                return None;
+            }
+            
             // TODO tratar os erros igual gente decente
             panic!("Invalid literal at: row {}, col {}", row, col);
         }
@@ -309,6 +319,8 @@ fn get_float_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token,
 }
 
 fn get_operator(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+    println!("get operator");
+    
     let mut icol = col;
 
     if !char_defines_operator(line[icol]) {
@@ -351,9 +363,11 @@ fn get_operator(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usiz
 }
 
 fn get_reserved_word_or_identifier(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
+    println!("get word");
+    
     let mut icol = col;
 
-    if !line[icol].is_ascii_alphabetic() {
+    if !line[icol].is_ascii_alphabetic() && line[icol] != '_' {
         return None;
     }
     
@@ -400,6 +414,8 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
     while src.read_until(b'\n', &mut buf)? != 0 {
         // TODO tratar os erros igual gente decente
         let l = String::from_utf8(buf).expect("source file is not UTF-8");
+        
+        println!("line");
 
         let line: Vec<char> = l.chars().collect();
 
@@ -407,28 +423,39 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         let line_indentation = get_line_indentation(&line);
         let next_char_col = line_indentation + 1;
 
+        println!("indentation {} {}", line.len(), next_char_col);
+
         // Ignora se for uma linha em branco
-        if line.len() >= next_char_col && line[next_char_col] != '\n' {
+        if line.len() > next_char_col && line[next_char_col] != '\n' {
             // TODO rename
             let tot_ind = ind.iter().sum();
 
             if line_indentation < tot_ind {
-                let difference = tot_ind - line_indentation;
+                let mut difference = tot_ind - line_indentation;
 
-                if Some(&difference) != ind.last() {
-                    // TODO tratar os erros igual gente decente
-                    panic!("Invalid indentation at: row {}, col {}", row, line_indentation);
-                }
+                while difference > 0 {
+                    let last = match ind.last() {
+                        Some(&i) => i,
+                        None => panic!("Invalid indentation at: row {}, col {}", row, line_indentation),
+                    };
+                    
+                    if difference < last {
+                        // TODO tratar os erros igual gente decente
+                        panic!("Invalid indentation at: row {}, col {}", row, line_indentation);
+                    }
                 
-                ind.pop();
-                tokens.push(Token::new(TkType::Dedentation, "".to_owned(), row, 0));
+                    ind.pop();
+                    difference -= last;
+                    tokens.push(Token::new(TkType::Dedentation, "".to_owned(), row, 0));
+                }
             } else if line_indentation > tot_ind {
                 let difference = line_indentation - tot_ind;
                 ind.push(difference);
                 tokens.push(Token::new(TkType::Indentaion, "".to_owned(), row, 0));
             }
-
         }
+
+        println!("after");
         
         let mut col = line_indentation;
 
@@ -474,6 +501,8 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
                         col = icol;
                         continue;
                     }
+
+                    println!("after");
 
                     if let Some((token, icol)) = get_int_literal(&line, col, row) {
                         tokens.push(token);
