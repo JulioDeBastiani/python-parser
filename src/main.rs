@@ -215,10 +215,14 @@ fn get_string_literal(line: &Vec<char>, delimiter: char, col: usize, row: usize)
             // TODO tratar os erros igual gente decente
             '\n' => panic!("Unexpected end of line at: row {}, col {}", row, icol),
             '\\' => {
+                println!("before if");
                 if line[icol + 1] == delimiter {
                     lexema.push(delimiter);
                     icol += 2;
+                } else {
+                    icol += 1;
                 }
+                println!("after if");
             },
             c => {
                 icol += 1;
@@ -386,6 +390,7 @@ fn get_reserved_word_or_identifier(line: &Vec<char>, col: usize, row: usize) -> 
             break;
         }
 
+        lexema.push(c);
         icol += 1
     }
 
@@ -417,7 +422,12 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         
         println!("line");
 
-        let line: Vec<char> = l.chars().collect();
+        let mut line: Vec<char> = l.chars().collect();
+
+        // FIXME por favor remover essa gambiarra
+        if line.last() != Some(&'\n') {
+            line.push('\n');
+        }
 
         // Indentacao
         let line_indentation = get_line_indentation(&line);
@@ -426,7 +436,7 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         println!("indentation {} {}", line.len(), next_char_col);
 
         // Ignora se for uma linha em branco
-        if line.len() > next_char_col && line[next_char_col] != '\n' {
+        if line.len() >= line_indentation && line[line_indentation] != '\n' {
             // TODO rename
             let tot_ind = ind.iter().sum();
 
@@ -532,6 +542,10 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         
         buf = l.into_bytes();
         buf.clear();
+    }
+
+    for _ in ind.iter() {
+        tokens.push(Token::new(TkType::Dedentation, "".to_owned(), row, 0));
     }
     
     Ok(tokens)

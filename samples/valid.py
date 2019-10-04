@@ -5,7 +5,7 @@ import keras
 import keras.layers
 from keras import backend as K
 
-STR_CONST = "str const"
+STR_CONST = "str \n\'\"const"
 int_var = 34
 
 def func(int_val, float_val):
@@ -17,4 +17,5 @@ def func(int_val, float_val):
         print("new val: " + str(new_val))
 
 if __name__ == "__main__":
-    func(34, 10.0)
+    func(34, 10.0) .0 3
+        z
