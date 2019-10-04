@@ -2,91 +2,91 @@ extern crate clap;
 
 use clap::{Arg, App};
 
+use std::fmt;
 use std::fs::File;
-// use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 
 static RESERVED_WORDS: [(&'static str, &'static str); 33] = [
-    ("and", "TK.AND"),
-    ("as", "TK.AS"),
-    ("assert", "TK.ASSERT"),
-    ("break", "TK.BREAK"),
-    ("class", "TK.CLASS"),
-    ("continue", "TK.CONTINUE"),
-    ("def", "TK.DEF"),
-    ("del", "TK.DEL"),
-    ("elif", "TK.ELIF"),
-    ("else", "TK.ELSE"),
-    ("except", "TK.EXCEPT"),
-    ("exec", "TK.EXEC"),
-    ("finally", "TK.FINALLY"),
-    ("for", "TK.FOR"),
-    ("from", "TK.FROM"),
-    ("global", "TK.GLOBAL"),
-    ("if", "TK.IF"),
-    ("import", "TK.IMPORT"),
-    ("in", "TK.IN"),
-    ("is", "TK.IS"),
-    ("lambda", "TK.LAMBDA"),
-    ("none", "TK.NONE"),
-    ("nonlocal", "TK.NONLOCAL"),
-    ("not", "TK.NOT"),
-    ("or", "TK.OR"),
-    ("pass", "TK.PASS"),
-    ("print", "TK.PRINT"),
-    ("raise", "TK.RAISE"),
-    ("return", "TK.RETURN"),
-    ("try", "TK.TRY"),
-    ("while", "TK.WHILE"),
-    ("with", "TK.WITH"),
-    ( "yield", "TK.YIELD")
+    ("and", "RWORD{AND}"),
+    ("as", "RWORD{AS}"),
+    ("assert", "RWORD{ASSERT}"),
+    ("break", "RWORD{BREAK}"),
+    ("class", "RWORD{CLASS}"),
+    ("continue", "RWORD{CONTINUE}"),
+    ("def", "RWORD{DEF}"),
+    ("del", "RWORD{DEL}"),
+    ("elif", "RWORD{ELIF}"),
+    ("else", "RWORD{ELSE}"),
+    ("except", "RWORD{EXCEPT}"),
+    ("exec", "RWORD{EXEC}"),
+    ("finally", "RWORD{FINALLY}"),
+    ("for", "RWORD{FOR}"),
+    ("from", "RWORD{FROM}"),
+    ("global", "RWORD{GLOBAL}"),
+    ("if", "RWORD{IF}"),
+    ("import", "RWORD{IMPORT}"),
+    ("in", "RWORD{IN}"),
+    ("is", "RWORD{IS}"),
+    ("lambda", "RWORD{LAMBDA}"),
+    ("none", "RWORD{NONE}"),
+    ("nonlocal", "RWORD{NONLOCAL}"),
+    ("not", "RWORD{NOT}"),
+    ("or", "RWORD{OR}"),
+    ("pass", "RWORD{PASS}"),
+    ("print", "RWORD{PRINT}"),
+    ("raise", "RWORD{RAISE}"),
+    ("return", "RWORD{RETURN}"),
+    ("try", "RWORD{TRY}"),
+    ("while", "RWORD{WHILE}"),
+    ("with", "RWORD{WITH}"),
+    ( "yield", "RWORD{YIELD}")
 ];
 
 static OPERATORS: [(&'static str, &'static str); 44] = [
-    ("+", "TK.MAIS"),
-    ("-", "TK.MENOS"),
-    ("*", "TK.VEZES"),
-    ("/", "TK.BARRA"),
-    ("%", "TK.PORCENTO"),
-    ("&", "TK.ECOMERCIAL"),
-    ("|", "TK.PIPE"),
-    ("^", "TK.CIRCUMFLEXO"),
-    ("~", "TK.TIL"),
-    ("<", "TK.MENOR"),
-    (">", "TK.MAIOR"),
-    ("(", "TK.PARENTESES_ESQUERDO"),
-    (")", "TK.PARENTESES_DIREITO"),
-    ("[", "TK.COLCHETES_ESQUERDO"),
-    ("]", "TK.COLCHETES_DIREITO"),
-    ("{", "TK.CHAVES_ESQUERDA"),
-    ("}", "TK.CHAVES_DIREITA"),
-    (",", "TK.VIRGULA"),
-    (":", "TK.DOIS_PONTOS"),
-    (".", "TK.PONTO"),
-    (";", "TK.PONTO_VIRGULA"),
-    ("@", "TK.ARROBA"),
-    ("=", "TK.IGUAL"),
-    ("**", "TK.NOME_PARAMETRO"),
-    ("//", "TK.BARRA_DUPLA"),
-    ("<<", "TK.SHIFT_LEFT"),
-    (">>", "TK.SHIFT_RIGHT"),
-    ("<=", "TK.MENOR_IGUAL"),
-    (">=", "TK.MAIOR_IGUAL"),
-    ("==", "TK.IGUAL_IGUAL"),
-    ("!=", "TK.DIFERENTE"),
-    ("+=", "TK.MAIS_IGUAL"),
-    ("-=", "TK.MENOS_IGUAL"),
-    ("*=", "TK.VEZES_IGUAL"),
-    ("/=", "TK.BARRA_IGUAL"),
-    ("//=", "TK.BARRA_DUPLA_IGUAL"),
-    ("%=", "TK.PORCENTO_IGUAL"),
-    ("@=", "TK.ARROBA_IGUAL"),
-    ("&=", "TK.ECOMERCIAL_IGUAL"),
-    ("|=", "TK.PIPE_IGUAL"),
-    ("^=", "TK.CIRCUMFLEXO_IGUAL"),
-    (">>=", "TK.SHIFT_RIGHT_IGUAL"),
-    ("<<=", "TK.SHIFT_LEFT_IGUAL"),
-    ("**=", "TK.DUPLO_ASTERISCO_IGUAL")
+    ("+", "OPERATOR{MAIS}"),
+    ("-", "OPERATOR{MENOS}"),
+    ("*", "OPERATOR{VEZES}"),
+    ("/", "OPERATOR{BARRA}"),
+    ("%", "OPERATOR{PORCENTO}"),
+    ("&", "OPERATOR{ECOMERCIAL}"),
+    ("|", "OPERATOR{PIPE}"),
+    ("^", "OPERATOR{CIRCUMFLEXO}"),
+    ("~", "OPERATOR{TIL}"),
+    ("<", "OPERATOR{MENOR}"),
+    (">", "OPERATOR{MAIOR}"),
+    ("(", "OPERATOR{PARENTESES_ESQUERDO}"),
+    (")", "OPERATOR{PARENTESES_DIREITO}"),
+    ("[", "OPERATOR{COLCHETES_ESQUERDO}"),
+    ("]", "OPERATOR{COLCHETES_DIREITO}"),
+    ("{", "OPERATOR{CHAVES_ESQUERDA}"),
+    ("}", "OPERATOR{CHAVES_DIREITA}"),
+    (",", "OPERATOR{VIRGULA}"),
+    (":", "OPERATOR{DOIS_PONTOS}"),
+    (".", "OPERATOR{PONTO}"),
+    (";", "OPERATOR{PONTO_VIRGULA}"),
+    ("@", "OPERATOR{ARROBA}"),
+    ("=", "OPERATOR{IGUAL}"),
+    ("**", "OPERATOR{NOME_PARAMETRO}"),
+    ("//", "OPERATOR{BARRA_DUPLA}"),
+    ("<<", "OPERATOR{SHIFT_LEFT}"),
+    (">>", "OPERATOR{SHIFT_RIGHT}"),
+    ("<=", "OPERATOR{MENOR_IGUAL}"),
+    (">=", "OPERATOR{MAIOR_IGUAL}"),
+    ("==", "OPERATOR{IGUAL_IGUAL}"),
+    ("!=", "OPERATOR{DIFERENTE}"),
+    ("+=", "OPERATOR{MAIS_IGUAL}"),
+    ("-=", "OPERATOR{MENOS_IGUAL}"),
+    ("*=", "OPERATOR{VEZES_IGUAL}"),
+    ("/=", "OPERATOR{BARRA_IGUAL}"),
+    ("//=", "OPERATOR{BARRA_DUPLA_IGUAL}"),
+    ("%=", "OPERATOR{PORCENTO_IGUAL}"),
+    ("@=", "OPERATOR{ARROBA_IGUAL}"),
+    ("&=", "OPERATOR{ECOMERCIAL_IGUAL}"),
+    ("|=", "OPERATOR{PIPE_IGUAL}"),
+    ("^=", "OPERATOR{CIRCUMFLEXO_IGUAL}"),
+    (">>=", "OPERATOR{SHIFT_RIGHT_IGUAL}"),
+    ("<<=", "OPERATOR{SHIFT_LEFT_IGUAL}"),
+    ("**=", "OPERATOR{DUPLO_ASTERISCO_IGUAL}")
 ];
 
 fn char_defines_operator(c: char) -> bool {
@@ -163,6 +163,25 @@ impl Token {
     }
 }
 
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let tp = match &self.tk_type {
+            TkType::Indentaion => "INDENT",
+            TkType::Dedentation => "DEDENT",
+            TkType::ReservedWord(w) => w,
+            TkType::Operator(w) => w,
+            TkType::Literal(t) => match t {
+                LiteralTypes::Int => "LITERAL{INT}",
+                LiteralTypes::Float => "LITERAL{FLOAT}",
+                LiteralTypes::String => "LITERAL{STRING}",
+            },
+            TkType::Identifier => "ID",
+        };
+        
+        write!(f, "Token: {: <40} {: <60} {:0>3} {:0>3}", tp, self.lexema, self.row, self.col)
+    }
+}
+
 // TODO passar um option com o char de indentacao do arquivo
 fn get_line_indentation(line: &Vec<char>) -> usize {
     let mut ind: usize = 0;
@@ -199,12 +218,12 @@ fn get_string_literal(line: &Vec<char>, delimiter: char, col: usize, row: usize)
                     icol += 2;
                 }
             },
-            delimiter => {
+            c => {
                 icol += 1;
-                break;
-            },
-            _ => {
-                icol += 1;
+
+                if c == delimiter {
+                    break;
+                }
             }
         }
     }
@@ -449,7 +468,7 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
                         None => panic!("Invalid Token at: row {}, col {}", row, col)
                     }
                 },
-                c => {
+                _ => {
                     if let Some((token, icol)) = get_float_literal(&line, col, row) {
                         tokens.push(token);
                         col = icol;
@@ -489,8 +508,17 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
     Ok(tokens)
 }
 
+fn dump_tokens(tokens: &Vec<Token>, filename: &str) -> std::io::Result<()> {
+    Ok(())
+}
+
 fn run(src_file: &str, out_dir: &str) -> std::io::Result<()> {
     let tokens = generate_tokens(src_file)?;
+
+    let mut filename = out_dir.to_owned();
+    filename.push_str("/out.lex");
+    dump_tokens(&tokens, &filename)?;
+
     Ok(())
 }
 
