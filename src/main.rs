@@ -198,8 +198,6 @@ fn get_line_indentation(line: &Vec<char>) -> usize {
 }
 
 fn get_string_literal(line: &Vec<char>, delimiter: char, col: usize, row: usize) -> Option<(Token, usize)> {
-    println!("get string literal");
-    
     if line[col] != delimiter {
         return None;
     }
@@ -215,14 +213,12 @@ fn get_string_literal(line: &Vec<char>, delimiter: char, col: usize, row: usize)
             // TODO tratar os erros igual gente decente
             '\n' => panic!("Unexpected end of line at: row {}, col {}", row, icol),
             '\\' => {
-                println!("before if");
                 if line[icol + 1] == delimiter {
                     lexema.push(delimiter);
                     icol += 2;
                 } else {
                     icol += 1;
                 }
-                println!("after if");
             },
             c => {
                 icol += 1;
@@ -239,8 +235,6 @@ fn get_string_literal(line: &Vec<char>, delimiter: char, col: usize, row: usize)
 }
 
 fn get_int_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
-    println!("get int literal");
-    
     let mut icol = col;
 
     if !line[icol].is_numeric() {
@@ -277,8 +271,6 @@ fn get_int_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, u
 }
 
 fn get_float_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
-    println!("get float literal {}", line[col] != '.' && !line[col].is_numeric());
-
     let mut icol = col;
 
     if line[icol] != '.' && !line[icol].is_numeric() {
@@ -323,8 +315,6 @@ fn get_float_literal(line: &Vec<char>, col: usize, row: usize) -> Option<(Token,
 }
 
 fn get_operator(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
-    println!("get operator");
-    
     let mut icol = col;
 
     if !char_defines_operator(line[icol]) {
@@ -367,8 +357,6 @@ fn get_operator(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usiz
 }
 
 fn get_reserved_word_or_identifier(line: &Vec<char>, col: usize, row: usize) -> Option<(Token, usize)> {
-    println!("get word");
-    
     let mut icol = col;
 
     if !line[icol].is_ascii_alphabetic() && line[icol] != '_' {
@@ -420,8 +408,6 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         // TODO tratar os erros igual gente decente
         let l = String::from_utf8(buf).expect("source file is not UTF-8");
         
-        println!("line");
-
         let mut line: Vec<char> = l.chars().collect();
 
         // FIXME por favor remover essa gambiarra
@@ -431,9 +417,6 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
 
         // Indentacao
         let line_indentation = get_line_indentation(&line);
-        let next_char_col = line_indentation + 1;
-
-        println!("indentation {} {}", line.len(), next_char_col);
 
         // Ignora se for uma linha em branco
         if line.len() >= line_indentation && line[line_indentation] != '\n' {
@@ -465,8 +448,6 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
             }
         }
 
-        println!("after");
-        
         let mut col = line_indentation;
 
         loop {
@@ -511,8 +492,6 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
                         col = icol;
                         continue;
                     }
-
-                    println!("after");
 
                     if let Some((token, icol)) = get_int_literal(&line, col, row) {
                         tokens.push(token);
@@ -573,7 +552,7 @@ fn run(src_file: &str, out_dir: &str) -> std::io::Result<()> {
 }
 
 fn main() {
-    let matches = App::new("pytthon-parser")
+    let matches = App::new("python-parser")
         .version("0.1")
         .author("Julio De Bastiani <julioc.debastiani@gmail.com>")
         .about("simple python parser")
