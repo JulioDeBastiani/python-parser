@@ -16,6 +16,10 @@ def func(int_val, float_val):
         new_val = int_val + float_val
         print("new val: " + str(new_val))
 
+    d = {
+        "key": value
+    }
+
 if __name__ == "__main__":
     func(34, 10.0) .0 3
         z

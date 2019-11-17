@@ -6,6 +6,11 @@ use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, Write, BufReader, BufWriter};
 
+enum CompilationError {
+    ParseError(String),
+    SintaxError(String)
+}
+
 static RESERVED_WORDS: [(&'static str, &'static str); 33] = [
     ("and", "RWORD{AND}"),
     ("as", "RWORD{AS}"),
@@ -142,6 +147,7 @@ enum TkType {
     Operator(&'static str),
     Literal(LiteralTypes),
     Identifier,
+    EOS
 }
 
 #[derive(Debug)]
@@ -176,6 +182,7 @@ impl fmt::Display for Token {
                 LiteralTypes::String => "LITERAL{STRING}",
             },
             TkType::Identifier => "ID",
+            TkType::EOS => "EOS"
         };
         
         write!(f, "Token: {: <40} {: <60} {:0>3} {:0>3}", tp, self.lexema, self.row, self.col)
@@ -401,6 +408,7 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
 
     let mut buf = Vec::<u8>::new();
     let mut ind = Vec::new();
+    let mut scope = Vec::<char>::new();
 
     let mut row: usize = 0;
 
@@ -418,8 +426,8 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         // Indentacao
         let line_indentation = get_line_indentation(&line);
 
-        // Ignora se for uma linha em branco
-        if line.len() >= line_indentation && line[line_indentation] != '\n' {
+        // Ignora se for uma linha em branco ou estiver dentro de um escopo
+        if line.len() >= line_indentation && line[line_indentation] != '\n' && scope.len() == 0 {
             // TODO rename
             let tot_ind = ind.iter().sum();
 
@@ -459,10 +467,74 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
                     col += 1;
                 },
                 '\n' => {
+                    if scope.len() == 0 {
+                        tokens.push(Token::new(TkType::EOS, "".to_string(), row, col));
+                    }
+                    
                     break;
                 },
                 '#' => {
                     break;
+                },
+                '(' => {
+                    let (_, optype) = OPERATORS[11];
+                    scope.push(')');
+                    tokens.push(Token::new(TkType::Operator(optype), "(".to_string(), row, col));
+                    col += 1;
+                },
+                ')' => {
+                    if let Some(&s) = scope.last() {
+                        if s != ')' {
+                            panic!("Expected '{}' but found ')' at: row {}, col {}", s, row, col)
+                        }
+                    } else {
+                        panic!("Unexpected ')' at: row {}, col {}", row, col)
+                    }
+                    
+                    let (_, optype) = OPERATORS[12];
+                    scope.pop();
+                    tokens.push(Token::new(TkType::Operator(optype), ")".to_string(), row, col));
+                    col += 1;
+                },
+                '[' => {
+                    let (_, optype) = OPERATORS[13];
+                    scope.push(']');
+                    tokens.push(Token::new(TkType::Operator(optype), "[".to_string(), row, col));
+                    col += 1;
+                },
+                ']' => {
+                    if let Some(&s) = scope.last() {
+                        if s != ']' {
+                            panic!("Expected '{}' but found ']' at: row {}, col {}", s, row, col)
+                        }
+                    } else {
+                        panic!("Unexpected ']' at: row {}, col {}", row, col)
+                    }
+                    
+                    let (_, optype) = OPERATORS[14];
+                    scope.pop();
+                    tokens.push(Token::new(TkType::Operator(optype), "]".to_string(), row, col));
+                    col += 1;
+                },
+                '{' => {
+                    let (_, optype) = OPERATORS[15];
+                    scope.push('}');
+                    tokens.push(Token::new(TkType::Operator(optype), "{".to_string(), row, col));
+                    col += 1;
+                },
+                '}' => {
+                    if let Some(&s) = scope.last() {
+                        if s != '}' {
+                            panic!("Expected '{}' but found '}}' at: row {}, col {}", s, row, col)
+                        }
+                    } else {
+                        panic!("Unexpected '}}' at: row {}, col {}", row, col)
+                    }
+                    
+                    let (_, optype) = OPERATORS[12];
+                    scope.pop();
+                    tokens.push(Token::new(TkType::Operator(optype), "}".to_string(), row, col));
+                    col += 1;
                 },
                 '\'' => {
                     // TODO bloco de comentario
