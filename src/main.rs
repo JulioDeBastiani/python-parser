@@ -5,6 +5,7 @@ use clap::{Arg, App};
 use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, Write, BufReader, BufWriter};
+use std::collections::HashMap;
 
 enum CompilationError {
     ParseError(String),
@@ -47,10 +48,15 @@ static RESERVED_WORDS: [(&'static str, &'static str); 33] = [
     ( "yield", "RWORD{YIELD}")
 ];
 
+const OP_ADD: &'static str = "+";
+const OP_MUL: &'static str = "*";
+const OP_OPB: &'static str = "(";
+const OP_CLB: &'static str = ")";
+
 static OPERATORS: [(&'static str, &'static str); 44] = [
-    ("+", "OPERATOR{MAIS}"),
+    (OP_ADD, "OPERATOR{MAIS}"),
     ("-", "OPERATOR{MENOS}"),
-    ("*", "OPERATOR{VEZES}"),
+    (OP_MUL, "OPERATOR{VEZES}"),
     ("/", "OPERATOR{BARRA}"),
     ("%", "OPERATOR{PORCENTO}"),
     ("&", "OPERATOR{ECOMERCIAL}"),
@@ -59,8 +65,8 @@ static OPERATORS: [(&'static str, &'static str); 44] = [
     ("~", "OPERATOR{TIL}"),
     ("<", "OPERATOR{MENOR}"),
     (">", "OPERATOR{MAIOR}"),
-    ("(", "OPERATOR{PARENTESES_ESQUERDO}"),
-    (")", "OPERATOR{PARENTESES_DIREITO}"),
+    (OP_OPB, "OPERATOR{PARENTESES_ESQUERDO}"),
+    (OP_CLB, "OPERATOR{PARENTESES_DIREITO}"),
     ("[", "OPERATOR{COLCHETES_ESQUERDO}"),
     ("]", "OPERATOR{COLCHETES_DIREITO}"),
     ("{", "OPERATOR{CHAVES_ESQUERDA}"),
@@ -132,14 +138,14 @@ fn char_acts_as_separator(c: char) -> bool {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum LiteralTypes {
     Int = 1,
     Float = 2,
     String = 4
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum TkType {
     Indentaion,
     Dedentation,
@@ -613,12 +619,165 @@ fn dump_tokens(tokens: &Vec<Token>, filename: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum PossibleStates {
+    E,
+    EL,
+    T,
+    TL,
+    F,
+    Terminal(TkType),
+    NOP
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct HmIndex {
+    state: PossibleStates,
+    token: TkType
+}
+
+fn generate_lookup_table() -> HashMap<HmIndex, Vec<PossibleStates>> {
+    let mut hm = HashMap::new();
+
+    // id
+    hm.insert(HmIndex {
+        state: PossibleStates::E,
+        token: TkType::Identifier
+    }, vec![PossibleStates::T, PossibleStates::EL]);
+    hm.insert(HmIndex {
+        state: PossibleStates::T,
+        token: TkType::Identifier
+    }, vec![PossibleStates::F, PossibleStates::TL]);
+    hm.insert(HmIndex {
+        state: PossibleStates::F,
+        token: TkType::Identifier
+    }, vec![PossibleStates::Terminal(TkType::Identifier)]);
+
+    // +
+    hm.insert(HmIndex {
+        state: PossibleStates::EL,
+        token: TkType::Operator("OPERATOR{MAIS}")
+    }, vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MAIS}")), PossibleStates::T, PossibleStates::EL]);
+    hm.insert(HmIndex {
+        state: PossibleStates::TL,
+        token: TkType::Operator("OPERATOR{MAIS}")
+    }, vec![PossibleStates::NOP]);
+
+    // *
+    hm.insert(HmIndex {
+        state: PossibleStates::TL,
+        token: TkType::Operator("OPERATOR{VEZES}")
+    }, vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{VEZES}")), PossibleStates::F, PossibleStates::TL]);
+
+    // (
+    hm.insert(HmIndex {
+        state: PossibleStates::E,
+        token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
+    }, vec![PossibleStates::T, PossibleStates::EL]);
+    hm.insert(HmIndex {
+        state: PossibleStates::T,
+        token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
+    }, vec![PossibleStates::F, PossibleStates::TL]);
+    hm.insert(HmIndex {
+        state: PossibleStates::F,
+        token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
+    }, vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")), PossibleStates::E, PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_DIREITO}"))]);
+
+    // )
+    hm.insert(HmIndex {
+        state: PossibleStates::EL,
+        token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
+    }, vec![PossibleStates::NOP]);
+    hm.insert(HmIndex {
+        state: PossibleStates::TL,
+        token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
+    }, vec![PossibleStates::NOP]);
+
+    // EOS
+    hm.insert(HmIndex {
+        state: PossibleStates::EL,
+        token: TkType::EOS
+    }, vec![PossibleStates::NOP]);
+    hm.insert(HmIndex {
+        state: PossibleStates::TL,
+        token: TkType::EOS
+    }, vec![PossibleStates::NOP]);
+
+    hm
+}
+
+fn parse(tokens: &Vec<Token>) -> Result<(), CompilationError> {
+    let hm = generate_lookup_table();
+    let mut stack = Vec::<PossibleStates>::new();
+
+    for tk in tokens.iter() {
+        if stack.is_empty() {
+            println!("empilha $");
+            stack.push(PossibleStates::Terminal(TkType::EOS));
+            println!("empilha E");
+            stack.push(PossibleStates::E);
+        }
+
+        println!("token {:?}", tk);
+
+        loop {
+            let last_state = stack.last().unwrap().clone();
+
+            if let PossibleStates::Terminal(tk_type) = last_state {
+                if tk.tk_type != tk_type {
+                    return Err(CompilationError::SintaxError(format!("Token mismatch, expected, '{:?}' but found '{:?}', at: row {}, col {}", tk_type, tk.tk_type, tk.row, tk.col)));
+                }
+                
+                stack.pop();
+                break;
+            }
+
+            let prox = HmIndex {
+                state: last_state,
+                token: tk.tk_type.clone()
+            };
+
+            println!("prox {:?}", prox);
+
+            match hm.get(&prox) {
+                Some(p) => {
+                    stack.pop();
+                    println!("desempilha");
+                    
+                    for s in p.iter().rev() {
+                        let cp = *s;
+
+                        if cp != PossibleStates::NOP {
+                            println!("empilha {:?}", cp);
+                            stack.push(cp);
+                        } else {
+                            println!("NOP");
+                        }
+                    }
+                },
+                None => {
+                    println!("stack {:?}", stack);
+                    return Err(CompilationError::SintaxError(format!("Unexpected state for token at: row {}, col {}", tk.row, tk.col)))
+                },
+            }
+        }
+    }
+    
+    println!("valid!!!");
+    Ok(())
+}
+
 fn run(src_file: &str, out_dir: &str) -> std::io::Result<()> {
     let tokens = generate_tokens(src_file)?;
 
     let mut filename = out_dir.to_owned();
     filename.push_str("/out.lex");
     dump_tokens(&tokens, &filename)?;
+    let res = parse(&tokens);
+
+    if let Err(CompilationError::SintaxError(error)) = res {
+        println!("Syntax error: {}", error);
+    }
 
     Ok(())
 }
