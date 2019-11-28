@@ -1,0 +1,56 @@
+statement_list        : statement statement_list_e
+statement_list_e      : statement statement_list_e
+                      | e
+scope                 : 'indent' statement_list 'dedent'
+statement             : function_def eos
+                      | flow_statement eos
+                      | return_statement eos
+                      | expression_statement eos
+                      | for_statement eos
+                      | while_statement eos
+                      | if_statement eos
+function_def          : 'def' id '(' id_list ')' ':' scope
+id_list               : id id_list_d
+id_list_d             : ',' id id_list_d
+                      | e
+flow_statement        : 'break'
+                      | 'continue'
+return_statement      : 'return' expression_list
+expression_statement  : function_call
+                      | assignment_expression
+function_call         : id '(' expression_list ')'
+expression_list       : expression expression_list_d
+expression_list_d     : ',' expression expression_list_d
+assignment_expression : id_list '=' expression_list
+                      | id '+=' expression
+                      | id '-=' expression
+                      | id '*=' expression
+                      | id '/=' expression
+expression            : expression_a 'and' expression
+                      | expression_a 'or' expression
+                      | expression_a
+expression_a          : expression_b == expression_a
+                      | expression_b != expression_a
+                      | expression_b < expression_a
+                      | expression_b <= expression_a
+                      | expression_b > expression_a
+                      | expression_b >= expression_a
+                      | 'not' expression_b
+                      | expression_b
+expression_b          : expression_c * expression_b
+                      | expression_c / expression_b
+                      | expression_c ^ expression_b
+expression_c          : expression_d + expression_c
+                      | expression_d - expression_c
+expression_d          : '(' expression ')'
+                      | function_call
+                      | id
+                      | int_literal
+                      | float_literal
+                      | string_literal
+for_statement         : 'for' id 'in' id ':' scope
+while_statement       : 'while' expression ':' scope
+if_statement          : 'if' expression ':' scope else_statement
+else_statement        : 'else' scope
+                      | 'elif' expression ':' scope else_statement
+                      | e
