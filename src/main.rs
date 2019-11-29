@@ -48,15 +48,10 @@ static RESERVED_WORDS: [(&'static str, &'static str); 33] = [
     ( "yield", "RWORD{YIELD}")
 ];
 
-const OP_ADD: &'static str = "+";
-const OP_MUL: &'static str = "*";
-const OP_OPB: &'static str = "(";
-const OP_CLB: &'static str = ")";
-
 static OPERATORS: [(&'static str, &'static str); 44] = [
-    (OP_ADD, "OPERATOR{MAIS}"),
+    ("+", "OPERATOR{MAIS}"),
     ("-", "OPERATOR{MENOS}"),
-    (OP_MUL, "OPERATOR{VEZES}"),
+    ("*", "OPERATOR{VEZES}"),
     ("/", "OPERATOR{BARRA}"),
     ("%", "OPERATOR{PORCENTO}"),
     ("&", "OPERATOR{ECOMERCIAL}"),
@@ -65,8 +60,8 @@ static OPERATORS: [(&'static str, &'static str); 44] = [
     ("~", "OPERATOR{TIL}"),
     ("<", "OPERATOR{MENOR}"),
     (">", "OPERATOR{MAIOR}"),
-    (OP_OPB, "OPERATOR{PARENTESES_ESQUERDO}"),
-    (OP_CLB, "OPERATOR{PARENTESES_DIREITO}"),
+    ("(", "OPERATOR{PARENTESES_ESQUERDO}"),
+    (")", "OPERATOR{PARENTESES_DIREITO}"),
     ("[", "OPERATOR{COLCHETES_ESQUERDO}"),
     ("]", "OPERATOR{COLCHETES_DIREITO}"),
     ("{", "OPERATOR{CHAVES_ESQUERDA}"),
@@ -153,7 +148,8 @@ enum TkType {
     Operator(&'static str),
     Literal(LiteralTypes),
     Identifier,
-    EOS
+    EOS,
+    END
 }
 
 #[derive(Debug)]
@@ -188,7 +184,8 @@ impl fmt::Display for Token {
                 LiteralTypes::String => "LITERAL{STRING}",
             },
             TkType::Identifier => "ID",
-            TkType::EOS => "EOS"
+            TkType::EOS => "EOS",
+            TkType::END => "END"
         };
         
         write!(f, "Token: {: <40} {: <60} {:0>3} {:0>3}", tp, self.lexema, self.row, self.col)
@@ -621,11 +618,30 @@ fn dump_tokens(tokens: &Vec<Token>, filename: &str) -> std::io::Result<()> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum PossibleStates {
-    E,
-    EL,
-    T,
-    TL,
-    F,
+    STATEMENT_LIST,
+    STATEMENT,
+    STATEMENT_LIST_E,
+    SCOPE,
+    ID_LIST,
+    EXPRESSION_LIST,
+    EXPRESSION_STATEMENT,
+    EXPRESSION,
+    ELSE_STATEMENT,
+    ID_LIST_D,
+    EXPRESSION_STATEMENTL,
+    ASSIGNMENT_EXPRESSIONL,
+    ID_OR_FCALL_D,
+    ID_OR_FCALL,
+    EXPRESSION_LIST_d,
+    ASSIGNMENT_EXPRESSION,
+    EXPRESSION_A,
+    EXPRESSIONL,
+    EXPRESSION_B,
+    EXPRESSION_AL,
+    EXPRESSION_C,
+    EXPRESSION_BL,
+    EXPRESSION_D,
+    EXPRESSION_CL,
     Terminal(TkType),
     NOP
 }
@@ -639,69 +655,778 @@ struct HmIndex {
 fn generate_lookup_table() -> HashMap<HmIndex, Vec<PossibleStates>> {
     let mut hm = HashMap::new();
 
+    let prod1 = vec![PossibleStates::STATEMENT, PossibleStates::STATEMENT_LIST_E];
+    let prod2 = vec![PossibleStates::STATEMENT, PossibleStates::STATEMENT_LIST_E];
+    let prod3 = vec![PossibleStates::NOP];
+    let prod4 = vec![PossibleStates::Terminal(TkType::Indentaion), PossibleStates::STATEMENT_LIST, PossibleStates::Terminal(TkType::Dedentation)];
+    let prod5 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{DEF}")), PossibleStates::Terminal(TkType::Identifier), PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")), PossibleStates::ID_LIST, PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_DIREITO}")), PossibleStates::Terminal(TkType::Operator("OPERATOR{DOIS_PONTOS}")), PossibleStates::Terminal(TkType::EOS), PossibleStates::SCOPE];
+    let prod6 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{BREAK}")), PossibleStates::Terminal(TkType::EOS)];
+    let prod7 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{CONTINUE}")), PossibleStates::Terminal(TkType::EOS)];
+    let prod8 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{RETURN}")), PossibleStates::EXPRESSION_LIST, PossibleStates::Terminal(TkType::EOS)];
+    let prod9 = vec![PossibleStates::EXPRESSION_STATEMENT, PossibleStates::Terminal(TkType::EOS)];
+    let prod10 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{FOR}")), PossibleStates::Terminal(TkType::Identifier), PossibleStates::Terminal(TkType::ReservedWord("RWORD{IN}")), PossibleStates::Terminal(TkType::Identifier), PossibleStates::Terminal(TkType::Operator("OPERATOR{DOIS_PONTOS}")), PossibleStates::Terminal(TkType::EOS), PossibleStates::SCOPE];
+    let prod11 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{WHILE}")), PossibleStates::EXPRESSION, PossibleStates::Terminal(TkType::Operator("OPERATOR{DOIS_PONTOS}")), PossibleStates::Terminal(TkType::EOS), PossibleStates::SCOPE];
+    let prod12 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{IF}")), PossibleStates::EXPRESSION, PossibleStates::Terminal(TkType::Operator("OPERATOR{DOIS_PONTOS}")), PossibleStates::Terminal(TkType::EOS), PossibleStates::SCOPE, PossibleStates::ELSE_STATEMENT];
+    let prod13 = vec![PossibleStates::Terminal(TkType::Identifier), PossibleStates::ID_LIST_D];
+    let prod14 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{PONTO_VIRGULA}")), PossibleStates::Terminal(TkType::Identifier), PossibleStates::ID_LIST_D];
+    let prod15 = vec![PossibleStates::NOP];
+    let prod16 = vec![PossibleStates::Terminal(TkType::Identifier), PossibleStates::EXPRESSION_STATEMENTL];
+    let prod17 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")), PossibleStates::EXPRESSION_LIST, PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_DIREITO}"))];
+    let prod18 = vec![PossibleStates::ASSIGNMENT_EXPRESSIONL];
+    let prod19 = vec![PossibleStates::Terminal(TkType::Identifier), PossibleStates::ID_OR_FCALL_D];
+    let prod20 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")), PossibleStates::EXPRESSION_LIST, PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_DIREITO}"))];
+    let prod21 = vec![PossibleStates::NOP];
+    let prod22 = vec![PossibleStates::EXPRESSION, PossibleStates::EXPRESSION_LIST_d];
+    let prod23 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{VIRGULA}")), PossibleStates::EXPRESSION, PossibleStates::EXPRESSION_LIST_d];
+    let prod24 = vec![PossibleStates::NOP];
+    let prod25 = vec![PossibleStates::Terminal(TkType::Identifier), PossibleStates::ASSIGNMENT_EXPRESSIONL];
+    let prod26 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{IGUAL}")), PossibleStates::EXPRESSION];
+    let prod27 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MAIS_IGUAL}")), PossibleStates::EXPRESSION];
+    let prod28 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MENOS_IGUAL}")), PossibleStates::EXPRESSION];
+    let prod29 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{VEZES_IGUAL}")), PossibleStates::EXPRESSION];
+    let prod30 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{BARRA_IGUAL}")), PossibleStates::EXPRESSION];
+    let prod31 = vec![PossibleStates::EXPRESSION_A, PossibleStates::EXPRESSIONL];
+    let prod32 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{AND}")), PossibleStates::EXPRESSION];
+    let prod33 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{OR}")), PossibleStates::EXPRESSION];
+    let prod34 = vec![PossibleStates::NOP];
+    let prod35 = vec![PossibleStates::EXPRESSION_B, PossibleStates::EXPRESSION_AL];
+    let prod36 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{NOT}")), PossibleStates::EXPRESSION_B];
+    let prod37 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{IGUAL_IGUAL}")), PossibleStates::EXPRESSION_A];
+    let prod38 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{DIFERENTE}")), PossibleStates::EXPRESSION_A];
+    let prod39 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MENOR}")), PossibleStates::EXPRESSION_A];
+    let prod40 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MENOR_IGUAL}")), PossibleStates::EXPRESSION_A];
+    let prod41 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MAIOR}")), PossibleStates::EXPRESSION_A];
+    let prod42 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MAIOR_IGUAL}")), PossibleStates::EXPRESSION_A];
+    let prod43 = vec![PossibleStates::NOP];
+    let prod44 = vec![PossibleStates::EXPRESSION_C, PossibleStates::EXPRESSION_BL];
+    let prod45 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{VEZES}")), PossibleStates::EXPRESSION_B];
+    let prod46 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{BARRA}")), PossibleStates::EXPRESSION_B];
+    let prod47 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{CIRCUMFLEXO}")), PossibleStates::EXPRESSION_B];
+    let prod48 = vec![PossibleStates::NOP];
+    let prod49 = vec![PossibleStates::EXPRESSION_D, PossibleStates::EXPRESSION_CL];
+    let prod50 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MAIS}")), PossibleStates::EXPRESSION_C];
+    let prod51 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MENOS}")), PossibleStates::EXPRESSION_C];
+    let prod52 = vec![PossibleStates::NOP];
+    let prod53 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")), PossibleStates::EXPRESSION, PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_DIREITO}"))];
+    let prod54 = vec![PossibleStates::ID_OR_FCALL];
+    let prod55 = vec![PossibleStates::Terminal(TkType::Literal(LiteralTypes::Int))];
+    let prod56 = vec![PossibleStates::Terminal(TkType::Literal(LiteralTypes::Float))];
+    let prod57 = vec![PossibleStates::Terminal(TkType::Literal(LiteralTypes::String))];
+    let prod58 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{ELSE}")), PossibleStates::Terminal(TkType::Operator("OPERATOR{DOIS_PONTOS}")), PossibleStates::Terminal(TkType::EOS), PossibleStates::SCOPE];
+    let prod59 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{ELIF}")), PossibleStates::EXPRESSION, PossibleStates::Terminal(TkType::Operator("OPERATOR{DOIS_PONTOS}")), PossibleStates::Terminal(TkType::EOS), PossibleStates::SCOPE, PossibleStates::ELSE_STATEMENT];
+    let prod60 = vec![PossibleStates::NOP];
+
+    // dedent
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::Dedentation
+    }, prod3.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::Dedentation
+    }, prod60.clone());
+
+    // indent
+    hm.insert(HmIndex {
+        state: PossibleStates::SCOPE,
+        token: TkType::Indentaion
+    }, prod4.clone());
+
+    // def
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST,
+        token: TkType::ReservedWord("RWORD{DEF}")
+    }, prod1.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT,
+        token: TkType::ReservedWord("RWORD{DEF}")
+    }, prod5.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::ReservedWord("RWORD{DEF}")
+    }, prod2.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::ReservedWord("RWORD{DEF}")
+    }, prod60.clone());
+
     // id
     hm.insert(HmIndex {
-        state: PossibleStates::E,
+        state: PossibleStates::STATEMENT_LIST,
         token: TkType::Identifier
-    }, vec![PossibleStates::T, PossibleStates::EL]);
+    }, prod1.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::T,
+        state: PossibleStates::STATEMENT,
         token: TkType::Identifier
-    }, vec![PossibleStates::F, PossibleStates::TL]);
+    }, prod9.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::F,
+        state: PossibleStates::STATEMENT_LIST,
         token: TkType::Identifier
-    }, vec![PossibleStates::Terminal(TkType::Identifier)]);
-
-    // +
+    }, prod2.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::EL,
-        token: TkType::Operator("OPERATOR{MAIS}")
-    }, vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{MAIS}")), PossibleStates::T, PossibleStates::EL]);
+        state: PossibleStates::ID_LIST,
+        token: TkType::Identifier
+    }, prod13.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::TL,
-        token: TkType::Operator("OPERATOR{MAIS}")
-    }, vec![PossibleStates::NOP]);
-
-    // *
+        state: PossibleStates::EXPRESSION_LIST,
+        token: TkType::Identifier
+    }, prod22.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::TL,
-        token: TkType::Operator("OPERATOR{VEZES}")
-    }, vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{VEZES}")), PossibleStates::F, PossibleStates::TL]);
+        state: PossibleStates::EXPRESSION_STATEMENT,
+        token: TkType::Identifier
+    }, prod16.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION,
+        token: TkType::Identifier
+    }, prod31.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::Identifier
+    }, prod60.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL,
+        token: TkType::Identifier
+    }, prod19.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ASSIGNMENT_EXPRESSION,
+        token: TkType::Identifier
+    }, prod25.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_A,
+        token: TkType::Identifier
+    }, prod35.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_B,
+        token: TkType::Identifier
+    }, prod44.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_C,
+        token: TkType::Identifier
+    }, prod49.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_D,
+        token: TkType::Identifier
+    }, prod54.clone());
 
     // (
     hm.insert(HmIndex {
-        state: PossibleStates::E,
+        state: PossibleStates::EXPRESSION_LIST,
         token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
-    }, vec![PossibleStates::T, PossibleStates::EL]);
+    }, prod22.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::T,
+        state: PossibleStates::EXPRESSION,
         token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
-    }, vec![PossibleStates::F, PossibleStates::TL]);
+    }, prod31.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::F,
+        state: PossibleStates::EXPRESSION_STATEMENTL,
         token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
-    }, vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")), PossibleStates::E, PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_DIREITO}"))]);
+    }, prod17.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
+    }, prod20.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_A,
+        token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
+    }, prod35.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_B,
+        token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
+    }, prod44.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_B,
+        token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
+    }, prod49.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_D,
+        token: TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")
+    }, prod53.clone());
 
     // )
     hm.insert(HmIndex {
-        state: PossibleStates::EL,
+        state: PossibleStates::ID_LIST_D,
         token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
-    }, vec![PossibleStates::NOP]);
+    }, prod15.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::TL,
+        state: PossibleStates::ID_OR_FCALL_D,
         token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
-    }, vec![PossibleStates::NOP]);
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_LIST_d,
+        token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
+    }, prod24.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSIONL,
+        token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
+    }, prod34.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
+    }, prod43.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{PARENTESES_DIREITO}")
+    }, prod52.clone());
+
+    // :
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{DOIS_PONTOS}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSIONL,
+        token: TkType::Operator("OPERATOR{DOIS_PONTOS}")
+    }, prod34.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{DOIS_PONTOS}")
+    }, prod43.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{DOIS_PONTOS}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{DOIS_PONTOS}")
+    }, prod52.clone());
 
     // EOS
     hm.insert(HmIndex {
-        state: PossibleStates::EL,
+        state: PossibleStates::ID_OR_FCALL_D,
         token: TkType::EOS
-    }, vec![PossibleStates::NOP]);
+    }, prod21.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::TL,
+        state: PossibleStates::EXPRESSION_LIST_d,
         token: TkType::EOS
-    }, vec![PossibleStates::NOP]);
+    }, prod24.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSIONL,
+        token: TkType::EOS
+    }, prod34.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::EOS
+    }, prod43.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::EOS
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::EOS
+    }, prod52.clone());
+
+    // ,
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_LIST_D,
+        token: TkType::Operator("OPERATOR{VIRGULA}")
+    }, prod14.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{VIRGULA}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_LIST_d,
+        token: TkType::Operator("OPERATOR{VIRGULA}")
+    }, prod23.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSIONL,
+        token: TkType::Operator("OPERATOR{VIRGULA}")
+    }, prod34.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{VIRGULA}")
+    }, prod43.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{VIRGULA}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{VIRGULA}")
+    }, prod52.clone());
+
+    // and
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::ReservedWord("RWORD{AND}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSIONL,
+        token: TkType::ReservedWord("RWORD{AND}")
+    }, prod33.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::ReservedWord("RWORD{AND}")
+    }, prod43.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::ReservedWord("RWORD{AND}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::ReservedWord("RWORD{AND}")
+    }, prod52.clone());
+
+    // or
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::ReservedWord("RWORD{OR}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSIONL,
+        token: TkType::ReservedWord("RWORD{OR}")
+    }, prod33.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::ReservedWord("RWORD{OR}")
+    }, prod43.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::ReservedWord("RWORD{OR}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::ReservedWord("RWORD{OR}")
+    }, prod52.clone());
+
+    // ==
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{IGUAL_IGUAL}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{IGUAL_IGUAL}")
+    }, prod37.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{IGUAL_IGUAL}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{IGUAL_IGUAL}")
+    }, prod52.clone());
+
+    // !=
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{DIFERENTE}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{DIFERENTE}")
+    }, prod38.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{DIFERENTE}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{DIFERENTE}")
+    }, prod52.clone());
+
+    // <
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{MENOR}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{MENOR}")
+    }, prod39.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{MENOR}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{MENOR}")
+    }, prod52.clone());
+
+    // <=
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{MENOR_IGUAL}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{MENOR_IGUAL}")
+    }, prod40.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{MENOR_IGUAL}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{MENOR_IGUAL}")
+    }, prod52.clone());
+
+    // >
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{MAIOR}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{MAIOR}")
+    }, prod41.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{MAIOR}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{MAIOR}")
+    }, prod52.clone());
+
+    // >=
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{MAIOR_IGUAL}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_AL,
+        token: TkType::Operator("OPERATOR{MAIOR_IGUAL}")
+    }, prod42.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{MAIOR_IGUAL}")
+    }, prod48.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{MAIOR_IGUAL}")
+    }, prod52.clone());
+
+    // *
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{VEZES}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{VEZES}")
+    }, prod45.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{VEZES}")
+    }, prod52.clone());
+
+    // /
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{BARRA}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{BARRA}")
+    }, prod46.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{BARRA}")
+    }, prod52.clone());
+
+    // ^
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{CIRCUMFLEXO}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_BL,
+        token: TkType::Operator("OPERATOR{CIRCUMFLEXO}")
+    }, prod47.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{CIRCUMFLEXO}")
+    }, prod52.clone());
+
+    // +
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{MAIS}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{MAIS}")
+    }, prod50.clone());
+
+    // -
+    hm.insert(HmIndex {
+        state: PossibleStates::ID_OR_FCALL_D,
+        token: TkType::Operator("OPERATOR{MENOS}")
+    }, prod21.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_CL,
+        token: TkType::Operator("OPERATOR{MENOS}")
+    }, prod51.clone());
+
+    // =
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_STATEMENTL,
+        token: TkType::Operator("OPERATOR{IGUAL}")
+    }, prod18.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ASSIGNMENT_EXPRESSIONL,
+        token: TkType::Operator("OPERATOR{IGUAL}")
+    }, prod26.clone());
+
+    // +=
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_STATEMENTL,
+        token: TkType::Operator("OPERATOR{MAIS_IGUAL}")
+    }, prod18.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ASSIGNMENT_EXPRESSIONL,
+        token: TkType::Operator("OPERATOR{MAIS_IGUAL}")
+    }, prod27.clone());
+
+    // -=
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_STATEMENTL,
+        token: TkType::Operator("OPERATOR{MENOS_IGUAL}")
+    }, prod18.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ASSIGNMENT_EXPRESSIONL,
+        token: TkType::Operator("OPERATOR{MENOS_IGUAL}")
+    }, prod28.clone());
+
+    // *=
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_STATEMENTL,
+        token: TkType::Operator("OPERATOR{VEZES_IGUAL}")
+    }, prod18.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ASSIGNMENT_EXPRESSIONL,
+        token: TkType::Operator("OPERATOR{VEZES_IGUAL}")
+    }, prod29.clone());
+
+    // /=
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_STATEMENTL,
+        token: TkType::Operator("OPERATOR{BARRA_IGUAL}")
+    }, prod18.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ASSIGNMENT_EXPRESSIONL,
+        token: TkType::Operator("OPERATOR{BARRA_IGUAL}")
+    }, prod30.clone());
+
+    // not
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_LIST,
+        token: TkType::ReservedWord("RWORD{NOT}")
+    }, prod22.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION,
+        token: TkType::ReservedWord("RWORD{NOT}")
+    }, prod31.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_A,
+        token: TkType::ReservedWord("RWORD{NOT}")
+    }, prod36.clone());
+
+    // int
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_LIST,
+        token: TkType::Literal(LiteralTypes::Int)
+    }, prod22.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION,
+        token: TkType::Literal(LiteralTypes::Int)
+    }, prod31.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_A,
+        token: TkType::Literal(LiteralTypes::Int)
+    }, prod35.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_B,
+        token: TkType::Literal(LiteralTypes::Int)
+    }, prod44.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_C,
+        token: TkType::Literal(LiteralTypes::Int)
+    }, prod49.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_D,
+        token: TkType::Literal(LiteralTypes::Int)
+    }, prod55.clone());
+
+    // float
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_LIST,
+        token: TkType::Literal(LiteralTypes::Float)
+    }, prod22.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION,
+        token: TkType::Literal(LiteralTypes::Float)
+    }, prod31.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_A,
+        token: TkType::Literal(LiteralTypes::Float)
+    }, prod35.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_B,
+        token: TkType::Literal(LiteralTypes::Float)
+    }, prod44.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_C,
+        token: TkType::Literal(LiteralTypes::Float)
+    }, prod49.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_D,
+        token: TkType::Literal(LiteralTypes::Float)
+    }, prod56.clone());
+
+    // string
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_LIST,
+        token: TkType::Literal(LiteralTypes::String)
+    }, prod22.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION,
+        token: TkType::Literal(LiteralTypes::String)
+    }, prod31.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_A,
+        token: TkType::Literal(LiteralTypes::String)
+    }, prod35.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_B,
+        token: TkType::Literal(LiteralTypes::String)
+    }, prod44.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_C,
+        token: TkType::Literal(LiteralTypes::String)
+    }, prod49.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::EXPRESSION_D,
+        token: TkType::Literal(LiteralTypes::String)
+    }, prod57.clone());
+
+    // break
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST,
+        token: TkType::ReservedWord("RWORD{BREAK}")
+    }, prod1.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT,
+        token: TkType::ReservedWord("RWORD{BREAK}")
+    }, prod6.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::ReservedWord("RWORD{BREAK}")
+    }, prod2.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::ReservedWord("RWORD{BREAK}")
+    }, prod60.clone());
+
+    // continue
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST,
+        token: TkType::ReservedWord("RWORD{CONTINUE}")
+    }, prod1.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT,
+        token: TkType::ReservedWord("RWORD{CONTINUE}")
+    }, prod7.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::ReservedWord("RWORD{CONTINUE}")
+    }, prod2.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::ReservedWord("RWORD{CONTINUE}")
+    }, prod60.clone());
+
+    // return
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST,
+        token: TkType::ReservedWord("RWORD{RETURN}")
+    }, prod1.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT,
+        token: TkType::ReservedWord("RWORD{RETURN}")
+    }, prod8.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::ReservedWord("RWORD{RETURN}")
+    }, prod2.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::ReservedWord("RWORD{RETURN}")
+    }, prod60.clone());
+
+    // for
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST,
+        token: TkType::ReservedWord("RWORD{FOR}")
+    }, prod1.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT,
+        token: TkType::ReservedWord("RWORD{FOR}")
+    }, prod10.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::ReservedWord("RWORD{FOR}")
+    }, prod2.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::ReservedWord("RWORD{FOR}")
+    }, prod60.clone());
+
+    // while
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST,
+        token: TkType::ReservedWord("RWORD{WHILE}")
+    }, prod1.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT,
+        token: TkType::ReservedWord("RWORD{WHILE}")
+    }, prod11.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::ReservedWord("RWORD{WHILE}")
+    }, prod2.clone());
+
+    // if
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST,
+        token: TkType::ReservedWord("RWORD{IF}")
+    }, prod1.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT,
+        token: TkType::ReservedWord("RWORD{IF}")
+    }, prod12.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::ReservedWord("RWORD{IF}")
+    }, prod2.clone());
+
+    // else
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::ReservedWord("RWORD{ELSE}")
+    }, prod58.clone());
+
+    // elif
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::ReservedWord("RWORD{ELIF}")
+    }, prod59.clone());
+
+    // $
+    hm.insert(HmIndex {
+        state: PossibleStates::STATEMENT_LIST_E,
+        token: TkType::END
+    }, prod3.clone());
+    hm.insert(HmIndex {
+        state: PossibleStates::ELSE_STATEMENT,
+        token: TkType::END
+    }, prod60.clone());
 
     hm
 }
@@ -710,14 +1435,12 @@ fn parse(tokens: &Vec<Token>) -> Result<(), CompilationError> {
     let hm = generate_lookup_table();
     let mut stack = Vec::<PossibleStates>::new();
 
-    for tk in tokens.iter() {
-        if stack.is_empty() {
-            println!("empilha $");
-            stack.push(PossibleStates::Terminal(TkType::EOS));
-            println!("empilha E");
-            stack.push(PossibleStates::E);
-        }
+    println!("empilha $");
+    stack.push(PossibleStates::Terminal(TkType::END));
+    println!("empilha produção inicial");
+    stack.push(PossibleStates::STATEMENT_LIST);
 
+    for tk in tokens.iter() {
         println!("token {:?}", tk);
 
         loop {

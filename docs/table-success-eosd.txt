@@ -1,0 +1,24 @@
+STATEMENT_LIST -> def, 1; id, 1; break, 1; continue, 1; return, 1; for, 1; while, 1; if, 1
+STATEMENT -> def, 5; id, 9; break, 6; continue, 7; return, 8; for, 10; while, 11; if, 12
+STATEMENT_LIST_E -> dedent, 3; def, 2; id, 2; break, 2; continue, 2; return, 2; for, 2; while, 2; if, 2; $, 3
+SCOPE -> indent, 4
+ID_LIST -> id, 13
+EXPRESSION_LIST -> id, 22; (, 22; not, 22; int_literal, 22; float_literal, 22; string_literal, 22
+EXPRESSION_STATEMENT -> id, 16
+EXPRESSION -> id, 31; (, 31; not, 31; int_literal, 31; float_literal, 31; string_literal, 31
+ELSE_STATEMENT -> dedent, 60; def, 60; id, 60; break, 60; continue, 60; return, 60; for, 60; else, 58; elif, 59; $, 60
+ID_LIST_D -> ), 15; ,, 14
+EXPRESSION_STATEMENTL -> (, 17; =, 18; +=, 18; -=, 18; *=, 18; /=, 18
+ASSIGNMENT_EXPRESSIONL -> =, 26; +=, 27; -=, 28; *=, 29; /=, 30
+ID_OR_FCALL_D -> (, 20; ), 21; :, 21; eos, 21; ,, 21; and, 21; or, 21; ==, 21; !=, 21; <, 21; <=, 21; >, 21; >=, 21; *, 21; /, 21; ^, 21; +, 21; -, 21
+ID_OR_FCALL -> id, 19
+EXPRESSION_LIST_d -> ), 24; eos, 24; ,, 23
+ASSIGNMENT_EXPRESSION -> id, 25
+EXPRESSION_A -> id, 35; (, 35; not 36; int_literal, 35; float_literal, 35; string_literal, 35
+EXPRESSIONL -> ), 34; :, 34; eos, 34; ,, 34; and, 33; or, 33
+EXPRESSION_B -> id, 44; (, 44; int_literal, 44; float_literal, 44; string_literal, 44
+EXPRESSION_AL -> ), 43; :, 43; eos, 43; ,, 43; and, 43; or, 43; ==, 37; !=, 38; <, 39; <=, 40; >, 41; >=, 42
+EXPRESSION_C -> id, 49; (, 49; int_literal, 49; float_literal, 49; string_literal, 49
+EXPRESSION_BL -> ), 48; :, 48; eos, 48; ,, 48; and, 48; or, 48; ==, 48; !=, 48; <, 48; <=, 48; >, 48; >=, 48; *, 45; /, 46; ^, 47
+EXPRESSION_D -> id, 54; (, 53; int_literal, 55; float_literal, 56; string_literal, 57
+EXPRESSION_CL -> ), 52; :, 52; eos, 52; ,, 52; and, 52; or, 52; ==, 52; !=, 52; <, 52; <=, 52; >, 52; >=, 52; *, 52; /, 52; ^, 52; +, 50; -, 51
