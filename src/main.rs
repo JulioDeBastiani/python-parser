@@ -12,7 +12,7 @@ enum CompilationError {
     SintaxError(String)
 }
 
-static RESERVED_WORDS: [(&'static str, &'static str); 33] = [
+static RESERVED_WORDS: [(&'static str, &'static str); 32] = [
     ("and", "RWORD{AND}"),
     ("as", "RWORD{AS}"),
     ("assert", "RWORD{ASSERT}"),
@@ -39,7 +39,7 @@ static RESERVED_WORDS: [(&'static str, &'static str); 33] = [
     ("not", "RWORD{NOT}"),
     ("or", "RWORD{OR}"),
     ("pass", "RWORD{PASS}"),
-    ("print", "RWORD{PRINT}"),
+    // ("print", "RWORD{PRINT}"),
     ("raise", "RWORD{RAISE}"),
     ("return", "RWORD{RETURN}"),
     ("try", "RWORD{TRY}"),
@@ -460,6 +460,7 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
         }
 
         let mut col = line_indentation;
+        let mut eos = false;
 
         loop {
             match line[col] {
@@ -470,7 +471,7 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
                     col += 1;
                 },
                 '\n' => {
-                    if scope.len() == 0 {
+                    if scope.len() == 0 && eos {
                         tokens.push(Token::new(TkType::EOS, "".to_string(), row, col));
                     }
                     
@@ -590,6 +591,8 @@ fn generate_tokens(src_file: &str) -> std::io::Result<Vec<Token>> {
                     panic!("Unidentified Token at: row {}, col {}", row, col)
                 }
             }
+
+            eos = true;
         }
 
         row += 1;
@@ -668,7 +671,7 @@ fn generate_lookup_table() -> HashMap<HmIndex, Vec<PossibleStates>> {
     let prod11 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{WHILE}")), PossibleStates::EXPRESSION, PossibleStates::Terminal(TkType::Operator("OPERATOR{DOIS_PONTOS}")), PossibleStates::Terminal(TkType::EOS), PossibleStates::SCOPE];
     let prod12 = vec![PossibleStates::Terminal(TkType::ReservedWord("RWORD{IF}")), PossibleStates::EXPRESSION, PossibleStates::Terminal(TkType::Operator("OPERATOR{DOIS_PONTOS}")), PossibleStates::Terminal(TkType::EOS), PossibleStates::SCOPE, PossibleStates::ELSE_STATEMENT];
     let prod13 = vec![PossibleStates::Terminal(TkType::Identifier), PossibleStates::ID_LIST_D];
-    let prod14 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{PONTO_VIRGULA}")), PossibleStates::Terminal(TkType::Identifier), PossibleStates::ID_LIST_D];
+    let prod14 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{VIRGULA}")), PossibleStates::Terminal(TkType::Identifier), PossibleStates::ID_LIST_D];
     let prod15 = vec![PossibleStates::NOP];
     let prod16 = vec![PossibleStates::Terminal(TkType::Identifier), PossibleStates::EXPRESSION_STATEMENTL];
     let prod17 = vec![PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_ESQUERDO}")), PossibleStates::EXPRESSION_LIST, PossibleStates::Terminal(TkType::Operator("OPERATOR{PARENTESES_DIREITO}"))];
@@ -760,7 +763,7 @@ fn generate_lookup_table() -> HashMap<HmIndex, Vec<PossibleStates>> {
         token: TkType::Identifier
     }, prod9.clone());
     hm.insert(HmIndex {
-        state: PossibleStates::STATEMENT_LIST,
+        state: PossibleStates::STATEMENT_LIST_E,
         token: TkType::Identifier
     }, prod2.clone());
     hm.insert(HmIndex {
